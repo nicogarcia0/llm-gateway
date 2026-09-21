@@ -1,0 +1,31 @@
+{
+  "port": 8080,
+  "clientKeys": [
+    { "name": "team-a", "key": "env:GATEWAY_KEY_TEAM_A", "ratePerMinute": 120 },
+    { "name": "team-b", "key": "env:GATEWAY_KEY_TEAM_B", "ratePerMinute": 30 }
+  ],
+  "providers": [
+    {
+      "name": "openai",
+      "baseUrl": "https://api.openai.com/v1",
+      "keys": ["env:OPENAI_KEY_1", "env:OPENAI_KEY_2"],
+      "weight": 3,
+      "maxConcurrent": 8,
+      "queueSize": 32,
+      "models": ["gpt-4o-mini"]
+    },
+    {
+      "name": "local-ollama",
+      "baseUrl": "http://host.docker.internal:11434/v1",
+      "weight": 1,
+      "maxConcurrent": 2,
+      "queueSize": 8,
+      "models": ["gpt-4o-mini", "llama3.2"]
+    }
+  ],
+  "upstreamTimeoutMs": 60000,
+  "queueTimeoutMs": 10000,
+  "maxAttempts": 3,
+  "breaker": { "failures": 3, "cooldownMs": 15000 },
+  "keyCooldownMs": 30000
+}
