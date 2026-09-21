@@ -12,7 +12,6 @@ async function listen(server: http.Server) {
   return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }
 
-/** Fake LLM upstream. Records the Authorization header of every hit. */
 async function mockUpstream(t: { after: (fn: () => void) => void }, handler: Handler) {
   const auths: string[] = [];
   const server = http.createServer((req, res) => {
@@ -194,6 +193,38 @@ test("lists configured models and exposes health and metrics", async (t) => {
   const metrics = await (await fetch(`${gw.url}/metrics`)).text();
   assert.match(metrics, /gateway_upstream_requests_total\{provider="p",status="200"\} 1/);
   assert.match(metrics, /gateway_provider_breaker_open\{provider="p"\} 0/);
+});
+
+test("answers 413 instead of resetting the connection on oversized bodies", async (t) => {
+  const up = await mockUpstream(t, ok);
+  const gw = await startGateway(t, { providers: [{ name: "p", baseUrl: up.url }] });
+
+  const res = await fetch(`${gw.url}/v1/chat/completions`, {
+    method: "POST",
+    body: JSON.stringify({ model: "m", pad: "x".repeat(2_000_000) }),
+  });
+  assert.equal(res.status, 413);
+  assert.equal((await chat(gw.url)).status, 200);
+});
+
+test("releases the concurrency slot when the client disconnects mid-stream", async (t) => {
+  const up = await mockUpstream(t, (_req, res) => {
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    res.write("data: start\n\n");
+  });
+  const gw = await startGateway(t, { providers: [{ name: "p", baseUrl: up.url, maxConcurrent: 1, queueSize: 0 }] });
+
+  const ctl = new AbortController();
+  const res = await fetch(`${gw.url}/v1/chat/completions`, {
+    method: "POST",
+    body: JSON.stringify({ model: "m" }),
+    signal: ctl.signal,
+  });
+  await res.body!.getReader().read();
+  ctl.abort();
+  await new Promise((r) => setTimeout(r, 100));
+
+  assert.equal(gw.providers[0].limiter.inflight, 0);
 });
 
 test("rejects malformed requests", async (t) => {

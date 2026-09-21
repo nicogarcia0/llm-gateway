@@ -31,19 +31,22 @@ function readBody(req: http.IncomingMessage, limit: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
+    let tooLarge = false;
     req.on("data", (c: Buffer) => {
       size += c.length;
-      if (size > limit) {
+      if (size <= limit) return void chunks.push(c);
+      // Keep draining so the client can read our 413 instead of hitting a reset.
+      if (!tooLarge) {
+        tooLarge = true;
         reject(new Error("body_too_large"));
-        req.destroy();
-      } else chunks.push(c);
+      }
+      if (size > limit * 20) req.destroy();
     });
     req.on("end", () => resolve(Buffer.concat(chunks)));
     req.on("error", reject);
   });
 }
 
-/** Retry-After header (seconds) -> ms, if present and sane. */
 function retryAfterMs(res: Response): number | undefined {
   const v = Number(res.headers.get("retry-after"));
   return Number.isFinite(v) && v > 0 ? Math.min(v * 1000, 10 * 60_000) : undefined;
@@ -128,7 +131,7 @@ export function createGateway(config: Config, opts: { log?: boolean } = {}) {
         for (let k = 0; k < Math.max(1, provider.keyCount); k++) {
           if (attempts >= config.maxAttempts) break outer;
           const key = provider.nextKey();
-          if (!key) break; // every key of this provider is cooling down
+          if (!key) break;
           attempts++;
 
           const attempt = new AbortController();
@@ -154,7 +157,7 @@ export function createGateway(config: Config, opts: { log?: boolean } = {}) {
             sawUpstreamFailure = true;
             lastError = `${provider.name}: unreachable or timed out`;
             metrics.inc("gateway_retries_total", { provider: provider.name, reason: "network" });
-            break; // next provider
+            break;
           }
           clearTimeout(timer); // header timeout only; streaming bodies may run longer
 
@@ -167,7 +170,7 @@ export function createGateway(config: Config, opts: { log?: boolean } = {}) {
             sawUpstreamFailure = true;
             lastError = `${provider.name}: upstream ${status}`;
             metrics.inc("gateway_retries_total", { provider: provider.name, reason: String(status) });
-            continue; // next key of the same provider
+            continue;
           }
 
           if (status >= 500) {
@@ -176,10 +179,9 @@ export function createGateway(config: Config, opts: { log?: boolean } = {}) {
             sawUpstreamFailure = true;
             lastError = `${provider.name}: upstream ${status}`;
             metrics.inc("gateway_retries_total", { provider: provider.name, reason: String(status) });
-            break; // next provider
+            break;
           }
 
-          // Success or a client error (4xx): pass through untouched.
           provider.recordSuccess();
           const headers: Record<string, string> = {
             "x-gateway-provider": provider.name,

@@ -37,15 +37,10 @@ export class Provider {
     return this.models.length === 0 || this.models.includes(model);
   }
 
-  /** Lower is better: in-flight ratio normalised by weight. */
   get load() {
     return this.limiter.inflight / this.limiter.max / this.weight;
   }
 
-  /**
-   * Round-robin over keys that are not cooling down.
-   * Keyless providers return a single "no auth" key; returns undefined when every key is cooling.
-   */
   nextKey(): { value: string | null; cooldown: (ms: number) => void } | undefined {
     if (this.keys.length === 0) return { value: null, cooldown: () => {} };
     const now = Date.now();
@@ -71,7 +66,6 @@ export class Provider {
   }
 }
 
-/** Eligible providers for a model, least-loaded first (random tie-break). */
 export function pickOrder(providers: Provider[], model: string): Provider[] {
   return providers
     .filter((p) => p.supports(model) && !p.breakerOpen)

@@ -3,18 +3,15 @@ import { readFileSync } from "node:fs";
 export type ProviderConfig = {
   name: string;
   baseUrl: string;
-  /** Upstream API keys. Use "env:NAME" to read from the environment. Empty = no auth (e.g. Ollama). */
   keys?: string[];
   weight?: number;
   maxConcurrent?: number;
   queueSize?: number;
-  /** Models served by this provider. Empty/omitted = any model. */
   models?: string[];
 };
 
 export type ClientKeyConfig = {
   name: string;
-  /** Use "env:NAME" to read from the environment. */
   key: string;
   ratePerMinute?: number;
 };

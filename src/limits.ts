@@ -1,7 +1,6 @@
 export class QueueFullError extends Error {}
 export class QueueTimeoutError extends Error {}
 
-/** Concurrency limiter with a bounded FIFO wait queue. */
 export class Semaphore {
   inflight = 0;
   readonly max: number;
@@ -52,7 +51,6 @@ export class Semaphore {
   }
 }
 
-/** Token bucket: `perMinute` requests per minute with burst up to `perMinute`. */
 export class TokenBucket {
   readonly perMinute: number;
   private tokens: number;

@@ -1,4 +1,3 @@
-/** Minimal Prometheus text-format exporter (counters + caller-supplied gauges). */
 export class Metrics {
   private counters = new Map<string, number>();
 
