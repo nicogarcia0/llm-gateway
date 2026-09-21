@@ -1,4 +1,4 @@
-# ai-gateway
+# llm-gateway
 
 A small proxy that sits between your apps and one or more LLM providers. It speaks the OpenAI API, so existing clients only need a different base URL.
 
@@ -6,7 +6,7 @@ It handles the parts that get repetitive once several services call LLMs: spread
 
 ```
 client A ─┐                                       ┌─▶ provider 1 (keys k1, k2)
-client B ─┼─▶ ai-gateway ─────────────────────────┼─▶ provider 2 (key k3)
+client B ─┼─▶ llm-gateway ─────────────────────────┼─▶ provider 2 (key k3)
 client C ─┘   auth, rate limit, route, queue      └─▶ local Ollama (no key)
               retry, key rotation
 ```

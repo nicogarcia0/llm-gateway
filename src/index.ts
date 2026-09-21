@@ -10,7 +10,7 @@ if (config.clientKeys.length === 0) {
 }
 
 server.listen(config.port, () => {
-  console.log(`ai-gateway listening on :${config.port} with ${config.providers.length} provider(s)`);
+  console.log(`llm-gateway listening on :${config.port} with ${config.providers.length} provider(s)`);
 });
 
 const shutdown = () => {

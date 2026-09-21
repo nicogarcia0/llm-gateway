@@ -1,5 +1,5 @@
 {
-  "name": "ai-gateway",
+  "name": "llm-gateway",
   "version": "0.1.0",
   "description": "Self-hosted, OpenAI-compatible gateway: load balancing, failover, queues, rate limits and key pooling across LLM providers.",
   "type": "module",
