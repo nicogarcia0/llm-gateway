@@ -18,6 +18,8 @@ export type ClientKeyConfig = {
 
 export type Config = {
   port: number;
+  /** Enables the /admin dashboard. Unset = dashboard disabled. */
+  adminKey?: string;
   clientKeys: ClientKeyConfig[];
   providers: ProviderConfig[];
   upstreamTimeoutMs: number;
@@ -37,10 +39,13 @@ export function resolveSecret(value: string, env: NodeJS.ProcessEnv): string {
   return v;
 }
 
+export const mask = (s: string) => (s.length > 8 ? `••••${s.slice(-4)}` : "••••");
+
 export function withDefaults(input: ConfigInput, env: NodeJS.ProcessEnv = process.env): Config {
   if (!input.providers?.length) throw new Error("Config needs at least one provider");
   return {
     port: input.port ?? 8080,
+    adminKey: input.adminKey ? resolveSecret(input.adminKey, env) : undefined,
     clientKeys: (input.clientKeys ?? []).map((c) => ({
       ...c,
       key: resolveSecret(c.key, env),
@@ -62,6 +67,6 @@ export function withDefaults(input: ConfigInput, env: NodeJS.ProcessEnv = proces
   };
 }
 
-export function loadConfig(path: string, env: NodeJS.ProcessEnv = process.env): Config {
-  return withDefaults(JSON.parse(readFileSync(path, "utf8")), env);
+export function loadRaw(path: string): ConfigInput {
+  return JSON.parse(readFileSync(path, "utf8"));
 }

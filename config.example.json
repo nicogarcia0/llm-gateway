@@ -1,5 +1,6 @@
 {
   "port": 8080,
+  "adminKey": "env:GATEWAY_ADMIN_KEY",
   "clientKeys": [
     { "name": "team-a", "key": "env:GATEWAY_KEY_TEAM_A", "ratePerMinute": 120 },
     { "name": "team-b", "key": "env:GATEWAY_KEY_TEAM_B", "ratePerMinute": 30 }

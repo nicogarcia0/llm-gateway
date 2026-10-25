@@ -1,9 +1,11 @@
-import { loadConfig } from "./config.ts";
+import { loadRaw, withDefaults } from "./config.ts";
+import { fileStore } from "./configAdmin.ts";
 import { createGateway } from "./server.ts";
 
 const configPath = process.env.CONFIG_PATH ?? "config.json";
-const config = loadConfig(configPath);
-const { server } = createGateway(config);
+const raw = loadRaw(configPath);
+const config = withDefaults(raw);
+const { server } = createGateway(config, { store: fileStore(configPath, raw) });
 
 if (config.clientKeys.length === 0) {
   console.warn("WARNING: no clientKeys configured, the gateway accepts unauthenticated requests");

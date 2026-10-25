@@ -1,0 +1,1171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>llm-gateway · Admin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2314b8a6'/%3E%3Cpath d='M8 16h6l3-6 3 12 2-6h2' fill='none' stroke='%23042f2e' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0a0e13; --side: #0d1219; --surface: #121821; --surface-2: #181f2a; --surface-3: #1e2733; --border: #232d3b; --border-strong: #324156;
+  --text: #e8eef6; --muted: #8796ab; --faint: #5d6c80; --accent: #2dd4bf; --accent-ink: #042f2e; --accent-soft: #2dd4bf1c;
+  --ok: #34d399; --warn: #fbbf24; --err: #f87171; --info: #60a5fa;
+  --ok-bg: #34d3991f; --warn-bg: #fbbf241f; --err-bg: #f871711f; --info-bg: #60a5fa1f; --mute-bg: #8796ab1f;
+  --shadow: 0 1px 0 #ffffff07 inset, 0 10px 30px -18px #000c;
+  --glow: radial-gradient(900px 380px at 70% -120px, #2dd4bf14, transparent 70%);
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f3f5f8; --side: #ffffff; --surface: #ffffff; --surface-2: #f3f6fa; --surface-3: #e9eef5; --border: #e0e6ee; --border-strong: #c7d0dc;
+  --text: #0e1621; --muted: #5a6a7e; --faint: #8a98aa; --accent: #0d9488; --accent-ink: #ffffff; --accent-soft: #0d948814;
+  --ok: #059669; --warn: #b45309; --err: #dc2626; --info: #2563eb;
+  --ok-bg: #05966914; --warn-bg: #b4530914; --err-bg: #dc262614; --info-bg: #2563eb14; --mute-bg: #5a6a7e14;
+  --shadow: 0 1px 2px #0f172210, 0 10px 28px -20px #0f172240;
+  --glow: radial-gradient(900px 380px at 70% -120px, #0d94881a, transparent 70%);
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); scroll-behavior: smooth; }
+body { margin: 0; font: 14px/1.5 var(--font); color: var(--text); background: var(--glow) no-repeat, var(--bg); -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+button, input, select { font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+[hidden] { display: none !important; }
+.mono { font-family: var(--mono); font-size: 12.5px; }
+.muted { color: var(--muted); } .faint { color: var(--faint); }
+.ico { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+/* ---------- shell ---------- */
+.app { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; }
+.side { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 20px 14px 16px; background: var(--side); border-right: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 11px; padding: 2px 8px 22px; font-weight: 650; letter-spacing: -.01em; font-size: 15px; }
+.logo { width: 30px; height: 30px; border-radius: 9px; background: var(--accent); display: grid; place-items: center; flex: none; }
+.logo .ico { stroke: var(--accent-ink); stroke-width: 2.3; width: 18px; height: 18px; }
+.nav { display: flex; flex-direction: column; gap: 3px; }
+.nav-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); padding: 0 10px 8px; font-weight: 600; }
+.nav-item { position: relative; display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 10px; color: var(--muted); font-weight: 520; transition: background .15s, color .15s; }
+.nav-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-item[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.nav-item[aria-current="page"]::before { content: ""; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+.badge { margin-left: auto; min-width: 20px; padding: 0 6px; height: 20px; border-radius: 99px; display: inline-grid; place-items: center; font-size: 11.5px; font-weight: 650; background: var(--err-bg); color: var(--err); }
+.side-foot { margin-top: auto; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.side-foot .row1 { display: flex; align-items: center; gap: 9px; font-weight: 600; }
+.side-foot .meta { margin-top: 8px; font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
+
+.content { padding: 0 32px 64px; width: 100%; max-width: 1400px; margin: 0 auto; min-width: 0; }
+.topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 20px 0 16px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); }
+.topbar h1 { margin: 0; font-size: 22px; letter-spacing: -.02em; line-height: 1.2; }
+.topbar p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.spacer { flex: 1; }
+.tools { display: flex; align-items: center; gap: 8px; }
+.pill { white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 13px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 12.5px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; box-shadow: 0 0 0 0 var(--ok); animation: pulse 2.2s infinite; }
+.dot.off { background: var(--faint); animation: none; } .dot.bad { background: var(--err); animation: none; } .dot.warn { background: var(--warn); animation: none; } .dot.static { animation: none; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 12px; white-space: nowrap; border: 1px solid var(--border); background: var(--surface); border-radius: 9px; cursor: pointer; transition: background .15s, border-color .15s, transform .05s; }
+.btn:hover { background: var(--surface-2); border-color: var(--border-strong); } .btn:active { transform: translateY(1px); }
+.btn.icon { width: 34px; padding: 0; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; } .btn.primary:hover { filter: brightness(1.07); background: var(--accent); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); } .btn.ghost:hover { background: var(--surface-2); color: var(--text); }
+.btn.spin .ico { animation: spin .8s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
+.select, .input { height: 34px; border: 1px solid var(--border); background: var(--surface); border-radius: 9px; padding: 0 10px; transition: border-color .15s; }
+.select:hover, .input:hover { border-color: var(--border-strong); }
+.input-wrap { position: relative; } .input-wrap .ico { position: absolute; left: 11px; top: 9px; color: var(--faint); pointer-events: none; }
+.input-wrap .input { padding-left: 34px; width: 100%; }
+kbd { font: 11.5px var(--mono); padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border); border-bottom-width: 2px; color: var(--muted); background: var(--surface-2); }
+
+/* ---------- layout primitives ---------- */
+.page { display: none; } .page.active { display: block; animation: rise .28s ease both; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+.gap { margin-top: 20px; }
+.grid { display: grid; gap: 20px; }
+.kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.split { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.halves { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cards { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); min-width: 0; }
+.card-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 16px; min-height: 28px; }
+.card-h h2 { margin: 0; font-size: 14.5px; font-weight: 620; letter-spacing: -.005em; }
+.card-h .sub { color: var(--muted); font-size: 12.5px; font-weight: 450; margin-left: 8px; }
+.empty { display: grid; justify-items: center; gap: 8px; color: var(--muted); padding: 34px 10px; text-align: center; }
+.empty .ico { width: 28px; height: 28px; color: var(--faint); }
+
+/* ---------- kpis ---------- */
+.kpi { position: relative; overflow: hidden; padding: 18px 18px 14px; }
+.kpi .label { color: var(--muted); font-size: 12.5px; font-weight: 520; display: flex; align-items: center; justify-content: space-between; min-height: 22px; }
+.kpi .value { font-size: 31px; font-weight: 660; letter-spacing: -.03em; margin: 6px 0 2px; line-height: 1.15; }
+.kpi .value.flash { animation: flash .9s ease; } @keyframes flash { 0% { color: var(--accent); } }
+.kpi .sub { font-size: 12.5px; color: var(--muted); min-height: 19px; }
+.kpi.good .value { color: var(--ok); } .kpi.bad .value { color: var(--err); }
+.kpi .spark { display: block; width: 100%; height: 34px; margin-top: 10px; }
+.skeleton { background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: sh 1.3s infinite linear; border-radius: 8px; }
+@keyframes sh { to { background-position: -200% 0; } }
+.kpi.sk .l1 { height: 12px; width: 50%; } .kpi.sk .l2 { height: 30px; width: 65%; margin: 12px 0; } .kpi.sk .l3 { height: 12px; width: 80%; } .kpi.sk .l4 { height: 34px; margin-top: 12px; }
+
+/* ---------- chips, bars ---------- */
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 560; background: var(--mute-bg); color: var(--muted); white-space: nowrap; line-height: 1.55; }
+.chip.ok { background: var(--ok-bg); color: var(--ok); } .chip.warn { background: var(--warn-bg); color: var(--warn); } .chip.err { background: var(--err-bg); color: var(--err); } .chip.info { background: var(--info-bg); color: var(--info); }
+.chip.pick { cursor: pointer; } .chip.pick:hover { color: var(--text); background: var(--surface-3); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.track { height: 7px; border-radius: 99px; background: var(--surface-3); overflow: hidden; display: flex; }
+.track > i { display: block; height: 100%; background: var(--accent); } .track > i.f { background: var(--err); } .track > i.w { background: var(--warn); }
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); gap: 2px; }
+.seg button { border: 0; background: transparent; height: 26px; padding: 0 11px; border-radius: 7px; cursor: pointer; color: var(--muted); font-weight: 540; font-size: 12.5px; transition: background .15s, color .15s; }
+.seg button:hover { color: var(--text); } .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px #0003; }
+
+/* ---------- alerts ---------- */
+.alerts { display: grid; gap: 10px; } .alerts:empty { display: none; }
+.alerts + .kpis { margin-top: 20px; }
+.alert { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; border: 1px solid; font-size: 13.5px; }
+.alert.warn { background: var(--warn-bg); border-color: color-mix(in srgb, var(--warn) 35%, transparent); color: var(--warn); }
+.alert.err { background: var(--err-bg); border-color: color-mix(in srgb, var(--err) 35%, transparent); color: var(--err); }
+.alert.info { background: var(--info-bg); border-color: color-mix(in srgb, var(--info) 30%, transparent); color: var(--info); }
+.alert span { color: var(--text); } .alert b { font-weight: 640; }
+
+/* ---------- chart ---------- */
+.chart-wrap { position: relative; }
+.chart { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--faint); font: 11px var(--font); }
+.chart .gl { stroke: var(--border); stroke-dasharray: 3 5; }
+.chart .ok { fill: var(--accent); } .chart .fail { fill: var(--err); }
+.chart .hv { fill: var(--accent); opacity: .09; }
+.chart .bar { transition: opacity .15s; } .chart.hovering .bar { opacity: .5; } .chart.hovering .bar.on { opacity: 1; }
+.legend { display: flex; gap: 14px; color: var(--muted); font-size: 12.5px; }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
+.tip { position: absolute; top: 0; z-index: 3; pointer-events: none; min-width: 150px; padding: 10px 12px; border-radius: 10px; background: var(--surface-3); border: 1px solid var(--border-strong); box-shadow: 0 12px 28px -10px #000a; font-size: 12.5px; opacity: 0; transition: opacity .12s; }
+.tip.on { opacity: 1; } .tip b { display: block; margin-bottom: 4px; } .tip div { display: flex; align-items: center; gap: 7px; color: var(--muted); } .tip i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; } .tip em { margin-left: auto; font-style: normal; color: var(--text); font-weight: 600; padding-left: 14px; }
+
+/* ---------- lists ---------- */
+.list { display: grid; }
+.list-row { display: flex; align-items: center; gap: 12px; padding: 11px 8px; margin: 0 -8px; border-radius: 10px; cursor: pointer; transition: background .12s; text-align: left; background: none; border: 0; width: calc(100% + 16px); }
+.list-row:hover { background: var(--surface-2); }
+.list-row .grow { flex: 1; min-width: 0; } .list-row .t { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ellip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-row { display: block; }
+.model-row .t { margin-bottom: 7px; }
+
+/* ---------- providers ---------- */
+.prov-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.prov-h .name { font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+.prov-h .url { color: var(--muted); font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; margin-top: 2px; }
+.meter { margin: 16px 0 6px; } .meter .t { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); margin-bottom: 7px; } .meter .track { height: 9px; }
+.stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0 4px; }
+.stats3 div { background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; padding: 10px 12px; }
+.stats3 b { display: block; font-size: 18px; letter-spacing: -.02em; } .stats3 span { font-size: 12px; color: var(--muted); }
+.sec-h { font-size: 11.5px; color: var(--faint); margin: 18px 0 9px; text-transform: uppercase; letter-spacing: .08em; font-weight: 650; }
+details.fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary .sec-h { margin: 18px 0 9px; } details.fold > summary .ico { transition: transform .2s; color: var(--faint); } details.fold[open] > summary .ico { transform: rotate(180deg); }
+.keyrow { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); }
+.keyrow:first-child { border-top: 0; }
+.matrix td, .matrix th { text-align: center; } .matrix td:first-child, .matrix th:first-child { text-align: left; }
+
+/* ---------- tables ---------- */
+.tablewrap { overflow: auto; margin: 0 -20px -20px; padding: 0 20px 20px; max-height: min(680px, calc(100vh - 300px)); min-height: 120px; }
+.tablewrap.flat { max-height: none; min-height: 0; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; position: sticky; top: 0; z-index: 1; background: var(--surface); padding: 0 14px 10px 0; border-bottom: 1px solid var(--border); }
+th button { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; border-radius: 4px; } th button:hover { color: var(--text); } th button:focus-visible { outline: 2px solid var(--accent); }
+th .arrow { opacity: 0; font-size: 9px; } th[aria-sort] .arrow { opacity: 1; color: var(--accent); }
+td { padding: 10px 14px 10px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr.click { cursor: pointer; } tbody tr.click:hover td { background: var(--surface-2); } tbody tr.click:focus-visible { outline-offset: -2px; }
+tbody tr.click td:first-child { padding-left: 10px; border-top-left-radius: 8px; border-bottom-left-radius: 8px; } tbody tr.click td:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+th:first-child { padding-left: 10px; } td:first-child { padding-left: 10px; }
+.r { text-align: right !important; } .detail { max-width: 300px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 12.5px; }
+.lat-ok { color: var(--text); } .lat-warn { color: var(--warn); } .lat-err { color: var(--err); }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+.toolbar .input-wrap { flex: 1 1 240px; max-width: 360px; }
+.foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 12.5px; margin-top: 16px; }
+
+/* ---------- config ---------- */
+.settings { display: grid; }
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 13px 0; border-top: 1px solid var(--border); }
+.setting:first-child { border-top: 0; padding-top: 2px; } .setting .d { color: var(--muted); font-size: 12.5px; } .setting b { white-space: nowrap; font-weight: 620; }
+
+/* ---------- drawer & toasts ---------- */
+.scrim { position: fixed; inset: 0; background: #0009; z-index: 40; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.scrim.on { opacity: 1; pointer-events: auto; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 100%); z-index: 41; background: var(--surface); border-left: 1px solid var(--border-strong); box-shadow: -24px 0 60px -20px #000a; transform: translateX(102%); visibility: hidden; transition: transform .28s cubic-bezier(.2, .8, .2, 1), visibility 0s .28s; display: flex; flex-direction: column; }
+.drawer.on { transform: none; visibility: visible; transition: transform .28s cubic-bezier(.2, .8, .2, 1); }
+.drawer-h { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+.drawer-h h2 { margin: 0; font-size: 16px; }
+.drawer-b { padding: 22px; overflow: auto; flex: 1; }
+.drawer-f { padding: 16px 22px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-wrap: wrap; }
+.kv { display: grid; grid-template-columns: 110px 1fr; gap: 12px 14px; margin: 22px 0 0; }
+.kv dt { color: var(--muted); font-size: 12.5px; padding-top: 1px; } .kv dd { margin: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: 8px; }
+.errbox { margin-top: 20px; padding: 12px 14px; border-radius: 11px; background: var(--err-bg); color: var(--err); font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.big-status { display: flex; align-items: center; gap: 14px; } .big-status .n { font-size: 36px; font-weight: 680; letter-spacing: -.03em; line-height: 1; }
+.toasts { position: fixed; bottom: 22px; right: 22px; z-index: 60; display: grid; gap: 8px; justify-items: end; }
+.toast { padding: 10px 15px; border-radius: 11px; background: var(--surface-3); border: 1px solid var(--border-strong); box-shadow: 0 14px 30px -12px #000b; font-size: 13.5px; animation: rise .25s ease both; display: flex; align-items: center; gap: 9px; }
+.toast.err { border-color: var(--err); } .toast .ico { color: var(--ok); } .toast.err .ico { color: var(--err); }
+
+/* ---------- settings ---------- */
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 22px; overflow-x: auto; scrollbar-width: none; }
+.tab { border: 0; background: none; padding: 10px 14px; color: var(--muted); font-weight: 560; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; display: flex; gap: 8px; align-items: center; transition: color .15s; }
+.tab:hover { color: var(--text); } .tab[aria-selected="true"] { color: var(--accent); border-color: var(--accent); }
+.tab .n { font-size: 11.5px; padding: 0 7px; border-radius: 99px; background: var(--mute-bg); }
+.intro { color: var(--muted); margin: 0 0 18px; max-width: 72ch; font-size: 13.5px; }
+.stack > * + * { margin-top: 14px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.field { display: grid; gap: 6px; align-content: start; min-width: 0; } .field.wide { grid-column: 1 / -1; }
+.flabel { font-size: 12.5px; font-weight: 560; color: var(--muted); }
+.field .input { width: 100%; height: 38px; }
+.hint { font-size: 12px; color: var(--faint); }
+.ferr { font-size: 12.5px; color: var(--err); } .ferr:empty { display: none; }
+.field.bad .input { border-color: var(--err); }
+.pcard { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); }
+.pcard > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px; }
+.pcard > summary::-webkit-details-marker { display: none; } .pcard > summary:hover { background: var(--surface-2); }
+.pcard .ps-main { flex: 1; min-width: 0; display: grid; } .pcard .ps-main b { font-size: 15.5px; letter-spacing: -.01em; }
+.pcard > summary .ico { color: var(--faint); transition: transform .2s; } .pcard[open] > summary .ico { transform: rotate(180deg); }
+.pcard[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.pbody { padding: 20px; border-top: 1px solid var(--border); display: grid; gap: 22px; }
+.pbody .sec-h { margin: 0 0 8px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.btn.danger { color: var(--err); } .btn.danger:hover { background: var(--err-bg); border-color: color-mix(in srgb, var(--err) 40%, transparent); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; min-height: 40px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); cursor: text; transition: border-color .15s; }
+.tags:hover { border-color: var(--border-strong); } .tags:focus-within { border-color: var(--accent); }
+.tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 9px; border-radius: 7px; background: var(--surface-3); }
+.tag button { all: unset; cursor: pointer; padding: 0 6px; color: var(--muted); line-height: 1.4; } .tag button:hover, .tag button:focus-visible { color: var(--err); }
+.tag-in { flex: 1; min-width: 150px; border: 0; background: transparent; outline: 0; padding: 3px 6px; }
+.keyline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--border); }
+.keyline-wrap:first-child .keyline { border-top: 0; padding-top: 0; }
+.keyline .meta { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.keyline .input { width: 100%; height: 36px; }
+.keyline-wrap .ferr { margin: -4px 0 6px; }
+.testout { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wrow { display: grid; grid-template-columns: minmax(90px, 150px) minmax(120px, 1fr) 96px minmax(130px, 1fr); gap: 16px; align-items: center; padding: 14px 0; border-top: 1px solid var(--border); }
+.wrow:first-of-type { border-top: 0; padding-top: 4px; }
+.wrow input[type="range"] { width: 100%; accent-color: var(--accent); }
+.wrow .input { height: 36px; width: 100%; }
+.share { display: grid; gap: 5px; } .share .t { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); }
+.savebar { position: sticky; bottom: 18px; z-index: 15; display: flex; align-items: center; gap: 12px; margin-top: 26px; padding: 12px 14px 12px 18px; border-radius: 14px; background: var(--surface-3); border: 1px solid var(--border-strong); box-shadow: 0 18px 40px -16px #000b; animation: rise .2s ease both; }
+.savebar .btn { height: 36px; }
+dialog.modal { border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); border-radius: 16px; padding: 0; width: min(520px, calc(100% - 32px)); box-shadow: 0 30px 80px -20px #000c; }
+dialog.modal::backdrop { background: #000a; }
+.modal-b { padding: 22px; max-height: min(70vh, 640px); overflow: auto; } .modal-b h2 { margin: 0; font-size: 17px; letter-spacing: -.01em; } .modal-b p { margin: 8px 0 0; font-size: 13.5px; }
+.modal-f { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border); }
+.presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.preset { text-align: left; display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-2); cursor: pointer; transition: border-color .15s, background .15s; min-width: 0; }
+.preset:hover { border-color: var(--accent); background: var(--surface-3); } .preset > * { min-width: 0; font-size: 12px; } .preset b { font-size: 13.5px; }
+.genkey { display: grid; gap: 6px; margin-top: 16px; padding: 12px 14px; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--border); }
+.genkey .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; } .genkey .mono { overflow-wrap: anywhere; color: var(--ok); }
+@media (max-width: 860px) { .savebar { bottom: 74px; flex-wrap: wrap; } .wrow { grid-template-columns: 1fr 96px; } .wrow .share { grid-column: 1 / -1; } .wrow input[type="range"] { grid-column: 1; } .presets { grid-template-columns: 1fr; } }
+
+/* ---------- login ---------- */
+.login { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+.login form { width: min(400px, 100%); padding: 28px; }
+.login h1 { margin: 18px 0 4px; font-size: 22px; letter-spacing: -.02em; }
+.login .input { width: 100%; height: 42px; margin: 20px 0 12px; background: var(--surface-2); }
+.login .btn { width: 100%; height: 42px; }
+.login .error { color: var(--err); min-height: 20px; margin: 10px 0 0; font-size: 13px; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 1180px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .split, .halves { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 860px) {
+  .app { display: block; }
+  .side { position: fixed; z-index: 30; top: auto; bottom: 0; left: 0; right: 0; height: auto; flex-direction: row; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); border-right: 0; border-top: 1px solid var(--border); }
+  .side .brand, .side .nav-label, .side-foot { display: none; }
+  .nav { flex-direction: row; width: 100%; gap: 2px; }
+  .nav-item { flex: 1; flex-direction: column; gap: 3px; padding: 7px 2px; font-size: 11px; justify-content: center; text-align: center; }
+  .nav-item[aria-current="page"]::before { display: none; }
+  .nav-item .badge { position: absolute; top: 2px; right: 8px; margin: 0; min-width: 16px; height: 16px; font-size: 10px; padding: 0 4px; }
+  .content { padding: 0 16px 96px; } .topbar { padding: 14px 0 12px; } .topbar h1 { font-size: 19px; } .topbar p, .hide-md { display: none; }
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  .drawer { width: 100%; }
+}
+@media (max-width: 560px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi { padding: 14px; } .kpi .value { font-size: 24px; } .kpi.wide { grid-column: 1 / -1; }
+  .card { padding: 16px; border-radius: 14px; } .tablewrap { margin: 0 -16px -16px; padding: 0 16px 16px; }
+  .pill .txt { display: none; } .pill { padding: 0 11px; } .hide-sm { display: none !important; } .stats3 { gap: 8px; } .toasts { left: 16px; right: 16px; bottom: 84px; justify-items: stretch; }
+  .toolbar .seg { width: 100%; } .toolbar .seg button { flex: 1; } .toolbar .select { flex: 1 1 40%; min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<section class="login" id="login" hidden>
+  <form class="card" id="login-form">
+    <div class="logo" aria-hidden="true" data-icon="pulse"></div>
+    <h1>llm-gateway admin</h1>
+    <div class="muted">Enter the admin key from your gateway config.</div>
+    <input class="input" id="key" type="password" placeholder="Admin key" autocomplete="current-password" aria-label="Admin key" required>
+    <button class="btn primary" type="submit">Sign in</button>
+    <p class="error" id="login-error" role="alert"></p>
+  </form>
+</section>
+
+<div class="app" id="app" hidden>
+  <aside class="side">
+    <div class="brand"><div class="logo" aria-hidden="true" data-icon="pulse"></div><span>llm-gateway</span></div>
+    <nav class="nav" aria-label="Sections">
+      <div class="nav-label">Monitor</div>
+      <a class="nav-item" href="#overview" data-route="overview" data-icon="grid"><span>Overview</span></a>
+      <a class="nav-item" href="#providers" data-route="providers" data-icon="server"><span>Providers</span><b class="badge" id="badge-providers" hidden></b></a>
+      <a class="nav-item" href="#clients" data-route="clients" data-icon="key"><span>Clients</span></a>
+      <a class="nav-item" href="#requests" data-route="requests" data-icon="activity"><span>Requests</span></a>
+      <a class="nav-item" href="#settings" data-route="settings" data-icon="sliders"><span>Settings</span><b class="badge warn" id="dirty-badge" hidden title="Unsaved changes">•</b></a>
+    </nav>
+    <div class="side-foot">
+      <div class="row1"><span class="dot static" id="side-dot"></span><span id="side-status">Connecting…</span></div>
+      <div class="meta" id="side-meta"></div>
+    </div>
+  </aside>
+
+  <div class="content">
+    <div class="topbar">
+      <div><h1 id="page-title">Overview</h1><p id="page-sub"></p></div>
+      <div class="spacer"></div>
+      <div class="tools">
+        <span class="pill" id="live"><span class="dot off" id="live-dot"></span><span class="txt" id="live-text">Connecting…</span></span>
+        <select class="select hide-md" id="interval" aria-label="Refresh interval">
+          <option value="5000">Every 5s</option><option value="15000">Every 15s</option><option value="30000">Every 30s</option><option value="0">Paused</option>
+        </select>
+        <button class="btn icon" id="refresh" type="button" aria-label="Refresh now" title="Refresh now (R)" data-icon="refresh"></button>
+        <button class="btn icon" id="theme" type="button" aria-label="Toggle theme" title="Toggle theme (T)" data-icon="moon"></button>
+        <button class="btn icon" id="logout" type="button" aria-label="Sign out" title="Sign out" data-icon="logout"></button>
+      </div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <section class="page" data-page="overview">
+      <div class="alerts" id="alerts"></div>
+      <div class="grid kpis" id="kpis">
+        <div class="card kpi sk"><div class="skeleton l1"></div><div class="skeleton l2"></div><div class="skeleton l3"></div><div class="skeleton l4"></div></div>
+        <div class="card kpi sk"><div class="skeleton l1"></div><div class="skeleton l2"></div><div class="skeleton l3"></div><div class="skeleton l4"></div></div>
+        <div class="card kpi sk"><div class="skeleton l1"></div><div class="skeleton l2"></div><div class="skeleton l3"></div><div class="skeleton l4"></div></div>
+      </div>
+      <div class="grid split gap">
+        <div class="card">
+          <div class="card-h"><h2>Traffic</h2>
+            <div style="display:flex;gap:16px;align-items:center">
+              <span class="legend hide-sm"><span><i style="background:var(--accent)"></i>Succeeded</span><span><i style="background:var(--err)"></i>Failed</span></span>
+              <div class="seg" id="range" role="group" aria-label="Time range"><button type="button" data-range="15" aria-pressed="false">15m</button><button type="button" data-range="30" aria-pressed="false">30m</button><button type="button" data-range="60" aria-pressed="true">1h</button></div>
+            </div>
+          </div>
+          <div class="chart-wrap" id="chart-wrap"><div id="chart"></div><div class="tip" id="tip" role="presentation"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h2>Top models<span class="sub" id="models-count"></span></h2></div>
+          <div class="list" id="models"></div>
+        </div>
+      </div>
+      <div class="grid halves gap">
+        <div class="card"><div class="card-h"><h2>Providers</h2><a class="btn ghost" href="#providers">View all</a></div><div class="list" id="ov-providers"></div></div>
+        <div class="card"><div class="card-h"><h2>Recent errors</h2><button class="btn ghost" type="button" id="ov-errors-all">View all</button></div><div class="list" id="ov-errors"></div></div>
+      </div>
+    </section>
+
+    <!-- PROVIDERS -->
+    <section class="page" data-page="providers">
+      <div class="grid cards" id="providers"></div>
+      <div class="card gap">
+        <div class="card-h"><h2>Model routing<span class="sub">which provider can serve which model</span></h2></div>
+        <div class="tablewrap flat"><table class="matrix"><thead id="matrix-head"></thead><tbody id="matrix"></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- CLIENTS -->
+    <section class="page" data-page="clients">
+      <div class="card">
+        <div class="card-h"><h2>Gateway API keys<span class="sub" id="clients-count"></span></h2><span class="muted hide-sm" style="font-size:12.5px">Click a row to see that client's requests</span></div>
+        <div class="tablewrap flat"><table>
+          <thead><tr id="clients-head"></tr></thead><tbody id="clients"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- REQUESTS -->
+    <section class="page" data-page="requests">
+      <div class="card">
+        <div class="toolbar">
+          <div class="input-wrap"><span data-icon="search" style="display:contents"></span><input class="input" id="f-q" type="search" placeholder="Search model, client, error, ID…" aria-label="Search requests"></div>
+          <div class="seg" id="f-status" role="group" aria-label="Status filter">
+            <button type="button" data-v="all" aria-pressed="true">All</button><button type="button" data-v="ok" aria-pressed="false">Success</button><button type="button" data-v="err" aria-pressed="false">Errors</button><button type="button" data-v="abort" aria-pressed="false">Aborted</button>
+          </div>
+          <select class="select" id="f-model" aria-label="Model"></select>
+          <select class="select" id="f-provider" aria-label="Provider"></select>
+          <select class="select" id="f-client" aria-label="Client"></select>
+          <button class="btn ghost" type="button" id="f-clear" hidden>Clear filters</button>
+          <div class="spacer"></div>
+          <button class="btn" type="button" id="export"><span data-icon="download" style="display:contents"></span>Export CSV</button>
+        </div>
+        <div class="tablewrap"><table>
+          <thead><tr id="req-head"></tr></thead><tbody id="recent"></tbody>
+        </table></div>
+        <div class="foot"><span id="req-count"></span><span class="hide-sm">Press <kbd>/</kbd> to search · click a row for details</span></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="page" data-page="settings">
+      <div class="tabs" id="set-tabs" role="tablist" aria-label="Settings sections"></div>
+      <div id="set-content"></div>
+      <div class="savebar" id="savebar" hidden>
+        <span class="dot warn static"></span>
+        <span><b>Unsaved changes.</b> <span class="muted hide-sm">They apply to the running gateway as soon as you save.</span></span>
+        <span class="spacer"></span>
+        <button class="btn ghost" id="discard" type="button">Discard</button>
+        <button class="btn primary" id="save" type="button">Save changes</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true">
+  <div class="drawer-h"><h2 id="drawer-title">Request details</h2><button class="btn icon ghost" type="button" id="drawer-close" aria-label="Close" data-icon="x"></button></div>
+  <div class="drawer-b" id="drawer-body"></div>
+  <div class="drawer-f" id="drawer-foot"></div>
+</aside>
+<dialog class="modal" id="modal" aria-label="Dialog"></dialog>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const nf = new Intl.NumberFormat();
+const KEY = "llm-gateway-admin-key", PREFS = "llm-gateway-admin-prefs";
+
+/* ---------- storage ---------- */
+const ss = { get: (k) => { try { return sessionStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { sessionStorage.setItem(k, v); } catch {} }, del: (k) => { try { sessionStorage.removeItem(k); } catch {} } };
+const prefs = (() => { let p = {}; try { p = JSON.parse(localStorage.getItem(PREFS) || "{}"); } catch {} return { get: (k, d) => (p[k] ?? d), set(k, v) { p[k] = v; try { localStorage.setItem(PREFS, JSON.stringify(p)); } catch {} } }; })();
+
+/* ---------- dom helpers (everything user-controlled goes through textContent) ---------- */
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v; else if (k === "text") el.textContent = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v); else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat(Infinity)) if (kid != null && kid !== false) el.append(kid);
+  return el;
+}
+const svg = (tag, attrs, ...kids) => { const el = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v); el.append(...kids); return el; };
+const ICONS = {
+  plus: "M12 5v14M5 12h14", trash: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6", bolt: "M13 2L3 14h9l-1 8 10-12h-9z",
+  pulse: "M3 12h5l3-7 4 14 3-7h3", grid: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z", server: "M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01",
+  key: "M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4",
+  activity: "M22 12h-4l-3 9L9 3l-3 9H2", sliders: "M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6",
+  refresh: "M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15", moon: "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z",
+  logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9", copy: "M9 9h11v11H9zM5 15H4V4h11v1", x: "M18 6L6 18M6 6l12 12",
+  download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3", search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35",
+  check: "M20 6L9 17l-5-5", chevron: "M6 9l6 6 6-6", alert: "M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
+  inbox: "M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z",
+};
+const icon = (n) => svg("svg", { viewBox: "0 0 24 24", class: "ico", "aria-hidden": "true" }, svg("path", { d: ICONS[n] }));
+const chip = (text, kind, extra) => h("span", { class: "chip " + (kind || ""), text, ...extra });
+const empty = (ic, text, ...kids) => h("div", { class: "empty" }, icon(ic), h("div", { text }), ...kids);
+
+/* ---------- formatting ---------- */
+const dur = (s) => { const d = Math.floor(s / 86400), hr = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return d ? `${d}d ${hr}h` : hr ? `${hr}h ${m}m` : m ? `${m}m ${s % 60}s` : `${s}s`; };
+const ms = (v) => v >= 10000 ? (v / 1000).toFixed(1) + " s" : v >= 1000 ? (v / 1000).toFixed(2) + " s" : Math.round(v) + " ms";
+const pct = (v, d = 1) => (v * 100).toFixed(v === 1 || v === 0 ? 0 : d) + "%";
+const clock = (ts) => new Date(ts).toLocaleTimeString([], { hour12: false });
+const hm = (ts) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+const ago = (ts) => { const s = Math.max(0, Math.round((Date.now() - ts) / 1000)); return s < 5 ? "just now" : s < 60 ? s + "s ago" : s < 3600 ? Math.floor(s / 60) + "m ago" : Math.floor(s / 3600) + "h ago"; };
+const STATUS_TEXT = { 200: "OK", 400: "Bad request", 401: "Unauthorized", 403: "Forbidden", 404: "Not found", 413: "Payload too large", 429: "Too many requests", 499: "Client closed request", 500: "Internal error", 502: "Bad gateway", 503: "Service unavailable", 504: "Gateway timeout" };
+const kindOf = (s) => (s < 400 ? "ok" : s === 499 ? "" : s < 500 ? "warn" : "err");
+const isErr = (r) => r.status >= 400 && r.status !== 499;
+const latClass = (v) => (v < 1500 ? "lat-ok" : v < 6000 ? "lat-warn" : "lat-err");
+
+/* ---------- state ---------- */
+const NO_FILTER = { q: "", status: "all", model: "", provider: "", client: "" };
+const state = {
+  data: null, route: "overview", range: +prefs.get("range", 60), hover: -1, lastOk: 0, timer: null, kpiPrev: {}, loading: false, geom: null,
+  f: { ...NO_FILTER },
+  sort: { req: { k: "ts", dir: -1 }, clients: { k: "total", dir: -1 } },
+};
+const ROUTES = {
+  overview: ["Overview", "Live health and traffic of your gateway"], providers: ["Providers", "Capacity, circuit breakers and upstream keys"],
+  clients: ["Clients", "Gateway API keys and who is using them"], requests: ["Requests", "Inspect, filter and export recent traffic"],
+  settings: ["Settings", "Providers, clients, balancing and limits"],
+};
+
+/* ---------- toasts & clipboard ---------- */
+function toast(text, bad) {
+  const t = h("div", { class: "toast" + (bad ? " err" : ""), role: "status" }, icon(bad ? "alert" : "check"), h("span", { text }));
+  $("toasts").append(t); setTimeout(() => t.remove(), 2600);
+}
+async function copy(text, label) {
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = h("textarea", { style: "position:fixed;opacity:0" }); ta.value = text; document.body.append(ta); ta.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch {} ta.remove(); if (!ok) return toast("Copy failed", true);
+  }
+  toast((label || "Text") + " copied");
+}
+
+/* ---------- sparkline ---------- */
+function spark(values, color) {
+  const W = 100, H = 34, max = Math.max(1, ...values), step = W / Math.max(1, values.length - 1);
+  const pts = values.map((v, i) => [i * step, H - 3 - (v / max) * (H - 8)]);
+  const line = pts.map(([x, y], i) => (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1)).join("");
+  return svg("svg", { class: "spark", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", "aria-hidden": "true" },
+    svg("path", { d: `${line}L${W} ${H}L0 ${H}Z`, fill: color, opacity: ".14" }),
+    svg("path", { d: line, fill: "none", stroke: color, "stroke-width": "1.6", "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round" }));
+}
+
+/* ---------- overview ---------- */
+function alertsFor(d) {
+  const out = [];
+  for (const p of d.providers) {
+    if (p.breakerOpen) out.push(["err", `${p.name}: circuit breaker open.`, `Traffic is routed elsewhere. Retrying in ${p.breakerRemainingSec}s.`]);
+    if (p.keys.length && p.keys.every((k) => k.cooldownSec > 0)) out.push(["warn", `${p.name}: every upstream key is cooling down.`, "Requests to this provider are skipped until a key recovers."]);
+    if (p.queueSize && p.queued >= p.queueSize * 0.8) out.push(["warn", `${p.name}: queue almost full.`, `${p.queued} of ${p.queueSize} waiting.`]);
+  }
+  if (!d.config.authEnabled) out.push(["info", "Client authentication is off.", "Anyone who can reach the gateway can use your upstream keys. Add clientKeys to config.json."]);
+  return out;
+}
+
+function kpi({ label, value, sub, kind, extra, sparkNode, wide }) {
+  const v = h("div", { class: "value", text: value });
+  if (state.kpiPrev[label] !== undefined && state.kpiPrev[label] !== value) v.classList.add("flash");
+  state.kpiPrev[label] = value;
+  return h("div", { class: "card kpi " + (kind || "") + (wide ? " wide" : "") }, h("div", { class: "label" }, h("span", { text: label }), extra), v, h("div", { class: "sub", text: sub }), sparkNode);
+}
+
+function renderKpis(d) {
+  const t = d.totals, per = d.series.map((s) => s.ok + s.failed), failed = d.series.map((s) => s.failed);
+  const cur = per.slice(-30).reduce((a, b) => a + b, 0), prev = per.slice(-60, -30).reduce((a, b) => a + b, 0);
+  const trend = prev === 0 ? (cur ? chip("new", "info") : null) : chip((cur >= prev ? "↑ " : "↓ ") + Math.abs(Math.round(((cur - prev) / prev) * 100)) + "%", "info", { title: "Last 30 min vs the 30 before" });
+  let last = 1; const rate = d.series.map((s) => (s.ok + s.failed ? (last = s.ok / (s.ok + s.failed)) : last));
+  $("kpis").replaceChildren(
+    kpi({ label: "Total requests", value: nf.format(t.total), sub: t.aborted ? `${nf.format(t.aborted)} aborted by clients` : "since the gateway started", extra: trend, sparkNode: spark(per, "var(--accent)"), wide: true }),
+    kpi({ label: "Success rate", value: pct(t.successRate), sub: "excluding client aborts", kind: !t.total ? "" : t.successRate >= 0.99 ? "good" : t.successRate < 0.9 ? "bad" : "", sparkNode: spark(rate, "var(--ok)") }),
+    kpi({ label: "Failed", value: nf.format(t.failed), sub: "4xx, 5xx and gateway errors", kind: t.failed ? "bad" : "", sparkNode: spark(failed, "var(--err)") }),
+    kpi({ label: "Latency p50", value: ms(t.latency.p50), sub: `p95 ${ms(t.latency.p95)} · avg ${ms(t.latency.avg)}` }),
+    kpi({ label: "Active now", value: nf.format(t.inflight), sub: `${nf.format(t.queued)} queued` }),
+  );
+}
+
+function renderChart(d) {
+  const s = d.series.slice(-state.range), W = 780, H = 320, L = 38, B = 26, T = 10, pw = W - L - 6, ph = H - B - T, bw = pw / s.length;
+  const max = Math.max(4, ...s.map((x) => x.ok + x.failed)), nice = Math.ceil(max / 4) * 4;
+  const root = svg("svg", { class: "chart" + (state.hover >= 0 ? " hovering" : ""), viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Requests per minute over the last ${state.range} minutes` });
+  for (let i = 0; i <= 4; i++) {
+    const y = T + ph - (ph * i) / 4;
+    root.append(svg("line", { class: "gl", x1: L, x2: W - 6, y1: y, y2: y }));
+    const t = svg("text", { x: L - 8, y: y + 3.5, "text-anchor": "end" }); t.textContent = Math.round((nice * i) / 4); root.append(t);
+  }
+  if (state.hover >= 0 && state.hover < s.length) root.append(svg("rect", { class: "hv", x: L + state.hover * bw, y: T, width: bw, height: ph, rx: 3 }));
+  s.forEach((p, i) => {
+    const x = L + i * bw, w = Math.max(1.5, bw - Math.min(3, bw * 0.25)), okH = (p.ok / nice) * ph, fH = (p.failed / nice) * ph, on = i === state.hover ? " on" : "";
+    if (p.ok) root.append(svg("rect", { class: "bar ok" + on, x: x + (bw - w) / 2, y: T + ph - okH - fH, width: w, height: okH, rx: 2 }));
+    if (p.failed) root.append(svg("rect", { class: "bar fail" + on, x: x + (bw - w) / 2, y: T + ph - fH, width: w, height: fH, rx: 2 }));
+  });
+  [0, 0.5, 1].forEach((f, n) => {
+    const i = Math.min(s.length - 1, Math.round(f * (s.length - 1))), t = svg("text", { x: L + i * bw + (n === 0 ? 0 : n === 2 ? bw : bw / 2), y: H - 6, "text-anchor": n === 0 ? "start" : n === 2 ? "end" : "middle" });
+    t.textContent = n === 2 ? "now" : hm(s[i].t); root.append(t);
+  });
+  state.geom = { W, L, bw, n: s.length, s };
+  $("chart").replaceChildren(root);
+}
+
+function chartHover(e) {
+  const g = state.geom; if (!g || !state.data) return;
+  const r = $("chart").getBoundingClientRect(), vx = ((e.clientX - r.left) / r.width) * g.W, idx = Math.floor((vx - g.L) / g.bw), tip = $("tip");
+  if (idx < 0 || idx >= g.n) return chartLeave();
+  if (idx !== state.hover) { state.hover = idx; renderChart(state.data); }
+  const p = state.geom.s[idx], x = ((g.L + (idx + 0.5) * g.bw) / g.W) * r.width, w = $("chart-wrap").clientWidth;
+  tip.replaceChildren(h("b", { text: hm(p.t) }),
+    h("div", {}, h("i", { style: "background:var(--accent)" }), "Succeeded", h("em", { text: nf.format(p.ok) })),
+    h("div", {}, h("i", { style: "background:var(--err)" }), "Failed", h("em", { text: nf.format(p.failed) })),
+    h("div", {}, h("i", { style: "background:var(--faint)" }), "Total", h("em", { text: nf.format(p.ok + p.failed) })));
+  tip.style.left = Math.max(0, Math.min(w - tip.offsetWidth, x - tip.offsetWidth / 2)) + "px"; tip.classList.add("on");
+}
+function chartLeave() { $("tip").classList.remove("on"); if (state.hover !== -1) { state.hover = -1; if (state.data) renderChart(state.data); } }
+
+function renderModels(d) {
+  const shown = d.models.slice(0, 6);
+  $("models-count").textContent = d.models.length ? (d.models.length > shown.length ? `top ${shown.length} of ${d.models.length}` : `${d.models.length} used`) : "";
+  if (!d.models.length) return $("models").replaceChildren(empty("inbox", "No requests yet"));
+  const max = shown[0].total;
+  $("models").replaceChildren(...shown.map((m) => h("button", { class: "list-row model-row", type: "button", title: `Show requests for ${m.name}`, onclick: () => viewRequests({ model: m.name }) },
+    h("div", { class: "t" }, h("span", { class: "mono ellip", text: m.name }), h("span", { class: "muted", text: m.failed ? `${nf.format(m.total)} · ${nf.format(m.failed)} failed` : nf.format(m.total) })),
+    h("div", { class: "track" }, h("i", { style: `width:${((m.total - m.failed) / max) * 100}%` }), h("i", { class: "f", style: `width:${(m.failed / max) * 100}%` })))));
+}
+
+const provHealth = (p) => (p.breakerOpen ? "err" : p.consecutiveFailures || (p.keys.length && p.keys.every((k) => k.cooldownSec)) ? "warn" : "ok");
+const provChip = (p) => p.breakerOpen ? chip(`Breaker open · ${p.breakerRemainingSec}s`, "err") : p.consecutiveFailures ? chip(`${p.consecutiveFailures} recent failure${p.consecutiveFailures > 1 ? "s" : ""}`, "warn") : chip("Healthy", "ok");
+
+function renderOverviewLists(d) {
+  $("ov-providers").replaceChildren(...d.providers.map((p) => {
+    const load = p.maxConcurrent ? (p.inflight / p.maxConcurrent) * 100 : 0, hl = provHealth(p);
+    return h("a", { class: "list-row", href: "#providers" },
+      h("span", { class: "dot " + (hl === "ok" ? "static" : hl === "warn" ? "warn" : "bad") }),
+      h("div", { class: "grow" }, h("div", { class: "t" }, h("b", { text: p.name }), h("span", { class: "muted", text: `${nf.format(p.served)} served` })), h("div", { class: "track", style: "margin-top:7px" }, h("i", { class: load > 85 ? "w" : "", style: `width:${load}%` }))),
+      provChip(p));
+  }));
+  const errs = d.recent.filter(isErr).slice(0, 6);
+  $("ov-errors").replaceChildren(...(errs.length ? errs.map((r) => h("button", { class: "list-row", type: "button", onclick: () => openDrawer(r) },
+    chip(String(r.status), kindOf(r.status)), h("div", { class: "grow" }, h("div", { class: "t" }, h("span", { class: "mono ellip", text: r.model }), h("span", { class: "faint", text: ago(r.ts) })), h("div", { class: "muted ellip", style: "font-size:12.5px", text: r.error || STATUS_TEXT[r.status] || "Error" }))))
+    : [empty("check", "No recent failures")]));
+}
+
+/* ---------- providers ---------- */
+function renderProviders(d) {
+  const maxUses = (p) => Math.max(1, ...p.keys.map((k) => k.uses));
+  $("providers").replaceChildren(...d.providers.map((p) => {
+    const load = p.maxConcurrent ? Math.min(100, (p.inflight / p.maxConcurrent) * 100) : 0;
+    return h("section", { class: "card" },
+      h("div", { class: "prov-h" }, h("div", {}, h("div", { class: "name", text: p.name }), h("div", { class: "url", text: p.baseUrl })), h("div", { class: "chips" }, chip(`weight ${p.weight}`), provChip(p))),
+      h("div", { class: "meter" }, h("div", { class: "t" }, h("span", { text: "Concurrency" }), h("span", { text: `${p.inflight} / ${p.maxConcurrent} slots · ${Math.round(load)}%` })), h("div", { class: "track" }, h("i", { class: load > 85 ? "w" : "", style: `width:${load}%` }))),
+      h("div", { class: "stats3" }, h("div", {}, h("b", { text: `${p.queued}/${p.queueSize}` }), h("span", { text: "Queued" })), h("div", {}, h("b", { text: nf.format(p.served) }), h("span", { text: "Served" })), h("div", {}, h("b", { text: String(p.consecutiveFailures) }), h("span", { text: "Consecutive fails" }))),
+      h("div", { class: "sec-h", text: "Models" }),
+      h("div", { class: "chips" }, p.models.length ? p.models.map((m) => chip(m, "pick", { class: "chip pick mono", title: `Show requests for ${m}`, onclick: () => viewRequests({ model: m, provider: p.name }) })) : chip("any model")),
+      h("details", { class: "fold", open: true }, h("summary", {}, h("span", { class: "sec-h", text: `Upstream keys (${p.keys.length})` }), icon("chevron")),
+        p.keys.length ? p.keys.map((k) => h("div", { class: "keyrow" }, h("span", { class: "mono", text: k.key }),
+          h("div", { class: "track", title: `${k.uses} uses` }, h("i", { style: `width:${(k.uses / maxUses(p)) * 100}%` })),
+          h("span", { class: "chips" }, chip(`${nf.format(k.uses)} ${k.uses === 1 ? "use" : "uses"}`), k.cooldownSec ? chip(`cooling ${k.cooldownSec}s`, "warn") : chip("active", "ok"))))
+          : h("div", { class: "muted", text: "No key. The gateway sends no Authorization header." })),
+      providerActions(p));
+  }));
+
+  const models = [...new Set(d.providers.flatMap((p) => p.models))].sort(), wild = d.providers.some((p) => !p.models.length);
+  $("matrix-head").replaceChildren(h("tr", {}, h("th", { text: "Model" }), ...d.providers.map((p) => h("th", { text: p.name }))));
+  const cell = (p, m) => (!p.models.length ? chip("any", "info") : p.models.includes(m) ? chip("✓", "ok") : h("span", { class: "faint", text: "—" }));
+  $("matrix").replaceChildren(...[...models.map((m) => h("tr", {}, h("td", { class: "mono", text: m }), ...d.providers.map((p) => h("td", {}, cell(p, m))))),
+    wild ? h("tr", {}, h("td", { class: "muted", text: "any other model" }), ...d.providers.map((p) => h("td", {}, p.models.length ? h("span", { class: "faint", text: "—" }) : chip("any", "info")))) : null].filter(Boolean));
+  const bad = d.providers.filter((p) => provHealth(p) !== "ok").length, b = $("badge-providers");
+  b.hidden = !bad; b.textContent = bad;
+}
+
+/* ---------- sortable tables ---------- */
+const TEXT_COLS = new Set(["name", "client", "model", "provider", "key", "error"]);
+function sortHead(tr, cols, key) {
+  const s = state.sort[key];
+  tr.replaceChildren(...cols.map(([k, label, cls]) => h("th", { class: cls || "", "aria-sort": s.k === k ? (s.dir > 0 ? "ascending" : "descending") : null },
+    h("button", { type: "button", onclick: () => { s.dir = s.k === k ? -s.dir : TEXT_COLS.has(k) ? 1 : -1; s.k = k; if (state.data) { renderClients(state.data); renderRequests(state.data); } } }, label, h("span", { class: "arrow", text: s.dir > 0 ? "▲" : "▼" })))));
+}
+const cmp = (k, dir) => (a, b) => { const x = a[k] ?? "", y = b[k] ?? ""; return (typeof x === "string" ? x.localeCompare(y) : x - y) * dir; };
+
+function renderClients(d) {
+  sortHead($("clients-head"), [["name", "Name"], ["key", "Key"], ["ratePerMinute", "Rate limit", "r"], ["total", "Requests", "r"], ["failed", "Failed", "r"], ["rate", "Failure rate", "r"], ["share", "Share"]], "clients");
+  $("clients-count").textContent = d.clients.length ? `${d.clients.length} configured` : "";
+  const s = state.sort.clients, max = Math.max(1, ...d.clients.map((c) => c.total));
+  const rows = d.clients.map((c) => ({ ...c, rate: c.total ? c.failed / c.total : 0, share: c.total })).sort(cmp(s.k, s.dir));
+  $("clients").replaceChildren(...(rows.length ? rows.map((c) => h("tr", { class: "click", tabindex: "0", title: `Show requests from ${c.name}`, onclick: () => viewRequests({ client: c.name }), onkeydown: (e) => e.key === "Enter" && viewRequests({ client: c.name }) },
+    h("td", { text: c.name }), h("td", { class: "mono muted", text: c.key }), h("td", { class: "r", text: `${c.ratePerMinute}/min` }), h("td", { class: "r", text: nf.format(c.total) }),
+    h("td", { class: "r" }, c.failed ? chip(nf.format(c.failed), "err") : h("span", { class: "faint", text: "0" })), h("td", { class: "r", text: c.total ? pct(c.rate) : "—" }),
+    h("td", { style: "min-width:140px" }, h("div", { class: "track" }, h("i", { style: `width:${((c.total - c.failed) / max) * 100}%` }), h("i", { class: "f", style: `width:${(c.failed / max) * 100}%` })))))
+    : [h("tr", {}, h("td", { colspan: 7 }, empty("key", "No client keys configured", h("div", { class: "faint", text: "Authentication is off. Add clientKeys to config.json." }))))]));
+}
+
+/* ---------- requests ---------- */
+function filtered(d) {
+  const f = state.f, q = f.q.trim().toLowerCase();
+  return d.recent.filter((r) =>
+    (f.status === "all" || (f.status === "ok" && r.status < 400) || (f.status === "err" && isErr(r)) || (f.status === "abort" && r.status === 499)) &&
+    (!f.model || r.model === f.model) && (!f.provider || r.provider === f.provider) && (!f.client || r.client === f.client) &&
+    (!q || `${r.id} ${r.client} ${r.model} ${r.provider || ""} ${r.error || ""} ${r.status}`.toLowerCase().includes(q)));
+}
+function fillSelect(sel, all, values, cur) {
+  if (sel === document.activeElement) return; // don't close an open dropdown
+  const list = [...new Set([...values, ...(cur ? [cur] : [])])].sort();
+  sel.replaceChildren(h("option", { value: "", text: all }), ...list.map((v) => h("option", { value: v, text: v })));
+  sel.value = cur;
+}
+function syncToolbar(d) {
+  const f = state.f;
+  fillSelect($("f-model"), "All models", d.recent.map((r) => r.model), f.model);
+  fillSelect($("f-provider"), "All providers", d.providers.map((p) => p.name), f.provider);
+  fillSelect($("f-client"), "All clients", [...d.clients.map((c) => c.name), ...d.recent.map((r) => r.client)], f.client);
+  if ($("f-q") !== document.activeElement) $("f-q").value = f.q;
+  document.querySelectorAll("#f-status button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === f.status)));
+  $("f-clear").hidden = !(f.q || f.status !== "all" || f.model || f.provider || f.client);
+}
+function renderRequests(d) {
+  syncToolbar(d);
+  sortHead($("req-head"), [["ts", "Time"], ["client", "Client"], ["model", "Model"], ["provider", "Provider"], ["status", "Status"], ["ms", "Latency", "r"], ["attempts", "Tries", "r"], ["error", "Detail"]], "req");
+  const s = state.sort.req, rows = filtered(d).sort(cmp(s.k, s.dir));
+  $("req-count").textContent = `Showing ${nf.format(rows.length)} of ${nf.format(d.recent.length)} recent requests · the last 200 are kept in memory`;
+  $("recent").replaceChildren(...(rows.length ? rows.map((r) => h("tr", { class: "click", tabindex: "0", onclick: () => openDrawer(r), onkeydown: (e) => e.key === "Enter" && openDrawer(r) },
+    h("td", { title: new Date(r.ts).toLocaleString(), text: clock(r.ts) }), h("td", { text: r.client }), h("td", { class: "mono", text: r.model }), h("td", { text: r.provider || "—" }),
+    h("td", {}, chip(r.status === 499 ? "499 aborted" : String(r.status), kindOf(r.status))), h("td", { class: "r " + latClass(r.ms), text: ms(r.ms) }), h("td", { class: "r", text: String(r.attempts) }), h("td", { class: "detail", title: r.error || "", text: r.error || "" })))
+    : [h("tr", {}, h("td", { colspan: 8 }, d.recent.length ? empty("search", "No requests match these filters", h("button", { class: "btn", type: "button", onclick: clearFilters, text: "Clear filters" })) : empty("inbox", "Requests will show up here as they arrive")))]));
+}
+function viewRequests(patch) {
+  state.f = { ...NO_FILTER, ...patch };
+  closeDrawer(); if (state.data) renderRequests(state.data);
+  if (state.route !== "requests") location.hash = "requests";
+}
+function clearFilters() { state.f = { ...NO_FILTER }; renderRequests(state.data); }
+
+function exportCsv() {
+  const rows = filtered(state.data).sort(cmp(state.sort.req.k, state.sort.req.dir)), q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = ["time,id,client,model,provider,status,latency_ms,attempts,error", ...rows.map((r) => [new Date(r.ts).toISOString(), r.id, r.client, r.model, r.provider, r.status, r.ms, r.attempts, r.error].map(q).join(","))].join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" })), a = h("a", { href: url, download: `gateway-requests-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv` });
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); toast(`Exported ${rows.length} requests`);
+}
+
+/* ---------- drawer ---------- */
+let drawerFrom = null;
+function openDrawer(r) {
+  drawerFrom = document.activeElement;
+  const kv = (k, ...v) => [h("dt", { text: k }), h("dd", {}, ...v)];
+  $("drawer-body").replaceChildren(
+    h("div", { class: "big-status" }, h("span", { class: "n", style: `color:var(--${kindOf(r.status) || "muted"})`, text: String(r.status) }), h("div", {}, h("div", { style: "font-weight:620", text: STATUS_TEXT[r.status] || "Response" }), h("div", { class: "muted", style: "font-size:12.5px", text: `${new Date(r.ts).toLocaleString()} · ${ago(r.ts)}` }))),
+    h("dl", { class: "kv" }, kv("Request ID", h("span", { class: "mono", text: r.id })), kv("Client", r.client), kv("Model", h("span", { class: "mono", text: r.model })), kv("Provider", r.provider || "None served it"),
+      kv("Latency", h("span", { class: latClass(r.ms), text: ms(r.ms) })), kv("Attempts", String(r.attempts))),
+    ...(r.error ? [h("div", { class: "errbox", text: r.error })] : []));
+  $("drawer-foot").replaceChildren(
+    h("button", { class: "btn primary", type: "button", onclick: () => copy(r.id, "Request ID"), text: "Copy request ID" }),
+    h("button", { class: "btn", type: "button", onclick: () => copy(JSON.stringify(r, null, 2), "JSON"), text: "Copy JSON" }),
+    h("button", { class: "btn", type: "button", onclick: () => viewRequests({ client: r.client }), text: "More from client" }),
+    h("button", { class: "btn", type: "button", onclick: () => viewRequests({ model: r.model }), text: "Same model" }));
+  $("scrim").classList.add("on"); $("drawer").classList.add("on"); $("drawer").setAttribute("aria-hidden", "false"); $("drawer-close").focus();
+}
+function closeDrawer() {
+  if (!$("drawer").classList.contains("on")) return;
+  $("scrim").classList.remove("on"); $("drawer").classList.remove("on"); $("drawer").setAttribute("aria-hidden", "true");
+  if (drawerFrom && document.contains(drawerFrom)) drawerFrom.focus(); drawerFrom = null;
+}
+
+/* ---------- api, modal ---------- */
+async function api(method, path, body) {
+  const res = await fetch(path, { method, headers: { authorization: "Bearer " + ss.get(KEY), ...(body !== undefined ? { "content-type": "application/json" } : {}) }, body: body === undefined ? undefined : JSON.stringify(body), cache: "no-store" });
+  if (res.status === 401) { ss.del(KEY); show(false); $("login-error").textContent = "Your session expired. Sign in again."; }
+  return { res, json: await res.json().catch(() => null) };
+}
+function modal({ title, body = [], actions = [] }) {
+  const dlg = $("modal");
+  dlg.replaceChildren(h("div", { class: "modal-b" }, h("h2", { text: title }), ...body),
+    h("div", { class: "modal-f" }, ...actions.map((a) => h("button", { class: "btn " + (a.kind || ""), type: "button", text: a.label, onclick: () => dlg.close(a.value) }))));
+  dlg.returnValue = "";
+  return new Promise((resolve) => { dlg.addEventListener("close", () => resolve(dlg.returnValue), { once: true }); dlg.showModal(); });
+}
+const confirmModal = async (title, text, label, danger) => (await modal({ title, body: [h("p", { class: "muted", text })], actions: [{ label: "Cancel", value: "" }, { label, value: "ok", kind: danger ? "danger" : "primary" }] })) === "ok";
+
+/* ---------- draft model ---------- */
+// The browser never holds a secret: existing keys are {keep: position, view: masked}, new ones are {value}.
+const cfg = { orig: null, draft: null, tab: "providers", errors: {}, open: new Set(), openName: null, scrollTo: null, saving: false, loading: false, failed: false };
+let uid = 0;
+const clone = (v) => JSON.parse(JSON.stringify(v));
+function toDraft(desc) {
+  return {
+    settings: clone(desc.settings),
+    providers: desc.providers.map((p) => ({ _id: ++uid, originalName: p.name, name: p.name, baseUrl: p.baseUrl, weight: p.weight, maxConcurrent: p.maxConcurrent, queueSize: p.queueSize, models: [...p.models], keys: p.keys.map((view, i) => ({ keep: i, view })) })),
+    clients: desc.clients.map((c) => ({ _id: ++uid, originalName: c.name, name: c.name, ratePerMinute: c.ratePerMinute, key: { keep: true, view: c.key } })),
+  };
+}
+function toPayload(d, extra) {
+  return {
+    settings: d.settings,
+    providers: d.providers.map((p) => ({ originalName: p.originalName, name: p.name, baseUrl: p.baseUrl, weight: p.weight, maxConcurrent: p.maxConcurrent, queueSize: p.queueSize, models: p.models, keys: p.keys.filter((k) => k.keep !== undefined || k.value.trim()).map((k) => (k.keep !== undefined ? { keep: k.keep } : { value: k.value })) })), // blank new-key rows are ignored
+    clients: d.clients.map((c) => ({ originalName: c.originalName, name: c.name, ratePerMinute: c.ratePerMinute, key: c.key.keep ? { keep: true } : c.key.generate ? { generate: true } : { value: c.key.value } })),
+    ...extra,
+  };
+}
+const isDirty = () => !!cfg.draft && JSON.stringify(toPayload(cfg.draft)) !== JSON.stringify(toPayload(cfg.orig));
+function updateDirty() {
+  const dirty = isDirty();
+  $("savebar").hidden = !dirty || state.route !== "settings"; $("dirty-badge").hidden = !dirty;
+  $("save").disabled = cfg.saving; $("save").textContent = cfg.saving ? "Saving…" : "Save changes";
+}
+async function ensureConfig(force) {
+  if (cfg.loading || (cfg.draft && !force) || state.data?.editable !== true) return;
+  cfg.loading = true;
+  try {
+    const { res, json } = await api("GET", "/admin/api/config");
+    if (!res.ok) throw new Error(json?.error?.message || "HTTP " + res.status);
+    cfg.orig = toDraft(json); cfg.draft = toDraft(json); cfg.failed = false;
+  } catch (e) { cfg.failed = true; toast("Could not load settings: " + e.message, true); }
+  finally { cfg.loading = false; renderSettings(); }
+}
+
+/* ---------- form helpers ---------- */
+function paintErrors() { document.querySelectorAll("#set-content [data-err]").forEach((n) => { const m = cfg.errors[n.dataset.err] || ""; n.textContent = m; n.closest(".field")?.classList.toggle("bad", !!m); }); }
+function clearErr(path) { if (path && cfg.errors[path]) { delete cfg.errors[path]; paintErrors(); } }
+function field(label, control, o = {}) {
+  return h("label", { class: "field" + (o.wide ? " wide" : "") }, h("span", { class: "flabel", text: label }), control, o.hint ? h("span", { class: "hint", text: o.hint }) : null, h("span", { class: "ferr", "data-err": o.path }));
+}
+function txtInput(obj, key, o) {
+  const inp = h("input", { class: "input", type: "text", value: obj[key], spellcheck: "false", autocomplete: "off", placeholder: o.placeholder });
+  inp.addEventListener("input", () => { obj[key] = inp.value; clearErr(o.path); updateDirty(); o.onInput?.(); });
+  return field(o.label, inp, o);
+}
+function numInput(obj, key, o) {
+  const scale = o.scale || 1;
+  const inp = h("input", { class: "input", type: "number", min: o.min, max: o.max, step: o.step || 1, value: obj[key] === "" ? "" : String(obj[key] / scale) });
+  inp.addEventListener("input", () => { obj[key] = inp.value === "" || isNaN(+inp.value) ? "" : scale === 1 ? +inp.value : Math.round(+inp.value * scale); clearErr(o.path); updateDirty(); o.onInput?.(); });
+  return field(o.label, inp, o);
+}
+const groupErr = (path) => (cfg.errors[path] ? h("div", { class: "alert err", role: "alert", style: "margin-bottom:16px" }, icon("alert"), h("span", { text: cfg.errors[path] })) : null);
+const roAlert = () => h("div", { class: "alert info", style: "margin-bottom:16px" }, icon("alert"), h("div", {}, h("b", { text: "Settings are read-only." }), " ", h("span", { text: "This gateway was started without a config file it can write to." })));
+
+/* ---------- providers tab ---------- */
+const PRESETS = [
+  { label: "OpenAI", id: "openai", baseUrl: "https://api.openai.com/v1" }, { label: "OpenRouter", id: "openrouter", baseUrl: "https://openrouter.ai/api/v1" },
+  { label: "Groq", id: "groq", baseUrl: "https://api.groq.com/openai/v1" }, { label: "Together AI", id: "together", baseUrl: "https://api.together.xyz/v1" },
+  { label: "Mistral", id: "mistral", baseUrl: "https://api.mistral.ai/v1" }, { label: "DeepSeek", id: "deepseek", baseUrl: "https://api.deepseek.com/v1" },
+  { label: "Ollama (local)", id: "ollama", baseUrl: "http://localhost:11434/v1", noKey: true }, { label: "LM Studio (local)", id: "lmstudio", baseUrl: "http://localhost:1234/v1", noKey: true },
+  { label: "Custom", id: "provider", baseUrl: "" },
+];
+async function addProvider() {
+  const choice = await modal({
+    title: "Add a provider",
+    body: [h("p", { class: "muted", text: "Pick a preset or start from scratch. You can change everything afterwards." }),
+      h("div", { class: "presets" }, ...PRESETS.map((pr, i) => h("button", { class: "preset", type: "button", onclick: () => $("modal").close(String(i)) }, h("b", { text: pr.label }), h("span", { class: "mono muted ellip", text: pr.baseUrl || "Any OpenAI-compatible API" }))))],
+    actions: [{ label: "Cancel", value: "" }],
+  });
+  if (choice === "") return;
+  const pr = PRESETS[+choice], taken = new Set(cfg.draft.providers.map((x) => x.name));
+  let name = pr.id, n = 2; while (taken.has(name)) name = `${pr.id}-${n++}`;
+  const p = { _id: ++uid, originalName: undefined, name, baseUrl: pr.baseUrl, weight: 1, maxConcurrent: pr.noKey ? 2 : 8, queueSize: 32, models: [], keys: pr.noKey ? [] : [{ value: "" }] };
+  cfg.draft.providers.push(p); cfg.open.add(p._id); cfg.tab = "providers"; renderSettings();
+  document.querySelector(`#set-content [data-id="${p._id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function modelsInput(p) {
+  const box = h("div", { class: "tags" }), inp = h("input", { class: "tag-in", "aria-label": "Add model", spellcheck: "false" });
+  const paint = (focus) => {
+    inp.placeholder = p.models.length ? "Add model…" : "Any model. Type a name and press Enter to restrict";
+    box.replaceChildren(...p.models.map((m, i) => h("span", { class: "tag mono" }, h("span", { text: m }), h("button", { type: "button", "aria-label": `Remove ${m}`, text: "×", onclick: () => { p.models.splice(i, 1); updateDirty(); paint(true); } }))), inp);
+    if (focus) inp.focus();
+  };
+  const add = (focus) => { for (const m of inp.value.split(/[\s,]+/).filter(Boolean)) if (!p.models.includes(m)) p.models.push(m); inp.value = ""; updateDirty(); paint(focus); };
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(true); }
+    else if (e.key === "Backspace" && !inp.value && p.models.length) { p.models.pop(); updateDirty(); paint(true); }
+  });
+  inp.addEventListener("blur", () => { if (inp.value.trim()) add(false); });
+  box.addEventListener("click", () => inp.focus());
+  box.paint = paint; paint(false);
+  return box;
+}
+
+function keyLine(p, i, j, repaint) {
+  const k = p.keys[j], path = `providers[${i}].keys[${j}]`;
+  const remove = h("button", { class: "btn ghost danger", type: "button", "aria-label": "Remove key", title: "Remove key", onclick: () => { p.keys.splice(j, 1); updateDirty(); repaint(); } }, icon("trash"));
+  let left, right;
+  if (k.value === undefined) {
+    left = h("div", { class: "meta" }, h("span", { class: "mono", text: k.view.masked }), k.view.source === "env" ? chip(k.view.ref, "info", { title: "Read from this environment variable" }) : chip("stored in config.json"));
+    right = h("div", { class: "chips" }, h("button", { class: "btn", type: "button", text: "Replace", onclick: () => { p.keys[j] = { value: "" }; updateDirty(); repaint(); wrapInputs(repaint)[j]?.focus(); } }), remove);
+  } else {
+    const inp = h("input", { class: "input", type: "password", placeholder: "sk-… or env:NAME", autocomplete: "new-password", spellcheck: "false", "aria-label": "Upstream key" });
+    inp.value = k.value;
+    inp.addEventListener("input", () => { k.value = inp.value; clearErr(path); updateDirty(); });
+    const toggle = h("button", { class: "btn ghost", type: "button", text: "Show", onclick: (e) => { inp.type = inp.type === "password" ? "text" : "password"; e.currentTarget.textContent = inp.type === "password" ? "Show" : "Hide"; } });
+    left = inp; right = h("div", { class: "chips" }, toggle, remove);
+  }
+  return h("div", { class: "keyline-wrap" }, h("div", { class: "keyline" }, left, right), h("span", { class: "ferr", "data-err": path }));
+}
+let keysWrap = null;
+const wrapInputs = () => (keysWrap ? [...keysWrap.querySelectorAll(".keyline-wrap")].map((w) => w.querySelector("input")) : []);
+function keysSection(p, i) {
+  const wrap = h("div");
+  const paint = () => {
+    keysWrap = wrap;
+    wrap.replaceChildren(...[...p.keys.map((_, j) => keyLine(p, i, j, paint)),
+      h("button", { class: "btn", type: "button", style: p.keys.length ? "margin-top:10px" : "", onclick: () => { p.keys.push({ value: "" }); updateDirty(); paint(); wrapInputs().at(-1)?.focus(); } }, icon("plus"), "Add key"),
+      p.keys.length ? null : h("span", { class: "muted", style: "margin-left:10px;font-size:12.5px", text: "No key: the gateway sends no Authorization header" })].filter(Boolean));
+    paintErrors();
+  };
+  paint();
+  return wrap;
+}
+
+async function testProvider(p, out) {
+  out.replaceChildren(chip("Testing…"));
+  const live = state.data.providers.find((x) => x.name === p.originalName), fresh = p.keys.find((k) => k.value)?.value;
+  const same = live && live.baseUrl === p.baseUrl.trim().replace(/\/$/, "");
+  const { json: r } = await api("POST", "/admin/api/test", same && !fresh ? { provider: p.originalName } : { baseUrl: p.baseUrl, key: fresh });
+  if (!r) return out.replaceChildren(chip("No answer", "err"));
+  out.replaceChildren(...[r.ok ? chip(`Connected · ${r.status} · ${ms(r.ms)}`, "ok") : chip(r.status ? `HTTP ${r.status}` : r.error || "Failed", "err"),
+    r.ok && r.models.length ? h("button", { class: "btn", type: "button", text: `Use ${r.models.length} model${r.models.length > 1 ? "s" : ""} found`, onclick: () => { p.models = [...r.models]; updateDirty(); renderSettings(); } }) : null,
+    r.ok && !r.models.length ? chip("no model list returned") : null].filter(Boolean));
+}
+async function resetProvider(name) {
+  const { res } = await api("POST", `/admin/api/providers/${encodeURIComponent(name)}/reset`);
+  toast(res.ok ? `${name}: breaker and key cooldowns cleared` : "Could not reset", !res.ok); load();
+}
+function providerActions(p) {
+  return h("div", { class: "actions", style: "margin-top:18px" },
+    state.data.editable ? h("button", { class: "btn", type: "button", onclick: () => editProvider(p.name) }, icon("sliders"), "Edit settings") : null,
+    provHealth(p) !== "ok" ? h("button", { class: "btn", type: "button", onclick: () => resetProvider(p.name) }, icon("refresh"), "Reset breaker & cooldowns") : null);
+}
+function editProvider(name) {
+  cfg.tab = "providers"; cfg.openName = name; cfg.scrollTo = name;
+  if (state.route === "settings") renderSettings(); else location.hash = "settings";
+}
+
+function providerCard(p, i) {
+  const live = p.originalName && state.data.providers.find((x) => x.name === p.originalName);
+  const hasErr = Object.keys(cfg.errors).some((k) => k.startsWith(`providers[${i}]`));
+  const title = h("b", { text: p.name || "New provider" }), sub = h("span", { class: "mono muted ellip", text: p.baseUrl });
+  const out = h("div", { class: "testout" }), at = (f) => `providers[${i}].${f}`;
+  const models = modelsInput(p);
+  const body = h("div", { class: "pbody" },
+    h("div", { class: "fields" },
+      txtInput(p, "name", { label: "Name", path: at("name"), hint: "Used in logs, metrics and the x-gateway-provider header", onInput: () => { title.textContent = p.name || "New provider"; } }),
+      numInput(p, "weight", { label: "Weight", path: at("weight"), min: 0.1, max: 1000, step: 0.1, hint: "Higher takes proportionally more traffic" }),
+      txtInput(p, "baseUrl", { label: "Base URL", path: at("baseUrl"), wide: true, placeholder: "https://api.openai.com/v1", hint: "Any OpenAI-compatible API, including the /v1 part", onInput: () => { sub.textContent = p.baseUrl; } }),
+      numInput(p, "maxConcurrent", { label: "Max concurrent", path: at("maxConcurrent"), min: 1, max: 1000, hint: "Requests in flight at once" }),
+      numInput(p, "queueSize", { label: "Queue size", path: at("queueSize"), min: 0, max: 10000, hint: "How many can wait before it answers 503" })),
+    h("div", {}, h("div", { class: "sec-h", text: "Models" }), models, h("div", { class: "hint", style: "margin-top:6px", text: "Only these models are routed here. Leave empty to serve any model." })),
+    h("div", {}, h("div", { class: "sec-h", text: "Upstream keys" }), keysSection(p, i), h("div", { class: "hint", style: "margin-top:8px", text: "Requests rotate across keys and a rate-limited key rests on its own. Paste a key, or reference an environment variable with env:NAME." })),
+    h("div", { class: "actions" },
+      h("button", { class: "btn", type: "button", onclick: () => testProvider(p, out) }, icon("bolt"), "Test connection"), out,
+      h("span", { class: "spacer" }),
+      live && provHealth(live) !== "ok" ? h("button", { class: "btn", type: "button", onclick: () => resetProvider(p.originalName) }, icon("refresh"), "Reset breaker") : null,
+      h("button", { class: "btn danger", type: "button", onclick: () => { cfg.draft.providers.splice(i, 1); updateDirty(); renderSettings(); } }, icon("trash"), "Remove provider")));
+  const det = h("details", { class: "pcard", "data-name": p.originalName || "", "data-id": p._id, open: cfg.open.has(p._id) || hasErr || (p.originalName && cfg.openName === p.originalName) ? true : null },
+    h("summary", {}, h("div", { class: "ps-main" }, title, sub), h("div", { class: "chips" }, !p.originalName ? chip("new", "info") : live ? provChip(live) : null), icon("chevron")), body);
+  det.addEventListener("toggle", () => (det.open ? cfg.open.add(p._id) : cfg.open.delete(p._id)));
+  return det;
+}
+function providersTab() {
+  const d = cfg.draft;
+  return [h("p", { class: "intro", text: "Providers are the upstream APIs the gateway balances across. Changes apply to the running gateway when you save; no restart needed." }), groupErr("providers"),
+    h("div", { class: "stack" }, d.providers.map(providerCard)),
+    h("div", { style: "margin-top:16px" }, h("button", { class: "btn primary", type: "button", onclick: addProvider }, icon("plus"), "Add provider"))];
+}
+
+/* ---------- clients tab ---------- */
+function clientRow(c, i) {
+  const at = (f) => `clients[${i}].${f}`, path = at("key"), orig = cfg.orig.clients.find((x) => x.originalName === c.originalName);
+  const set = (key) => { c.key = key; updateDirty(); renderSettings(); };
+  let left, right;
+  if (c.key.keep) {
+    left = h("div", { class: "meta" }, h("span", { class: "mono", text: c.key.view.masked }), c.key.view.source === "env" ? chip(c.key.view.ref, "info") : chip("stored in config.json"));
+    right = h("div", { class: "chips" }, h("button", { class: "btn", type: "button", onclick: () => set({ generate: true }) }, icon("refresh"), "Rotate"), h("button", { class: "btn", type: "button", text: "Set manually", onclick: () => set({ value: "" }) }));
+  } else if (c.key.generate) {
+    left = h("div", { class: "meta" }, chip("A new key is generated when you save", "ok"));
+    right = h("div", { class: "chips" }, orig ? h("button", { class: "btn", type: "button", text: "Keep current", onclick: () => set({ keep: true, view: orig.key.view }) }) : null, h("button", { class: "btn", type: "button", text: "Use my own", onclick: () => set({ value: "" }) }));
+  } else {
+    const inp = h("input", { class: "input", type: "password", placeholder: "At least 16 characters, or env:NAME", autocomplete: "new-password", spellcheck: "false", "aria-label": "Client key" });
+    inp.value = c.key.value; inp.addEventListener("input", () => { c.key.value = inp.value; clearErr(path); updateDirty(); });
+    left = inp; right = h("div", { class: "chips" }, h("button", { class: "btn", type: "button", onclick: () => set({ generate: true }) }, icon("refresh"), "Generate instead"));
+  }
+  return h("div", { class: "card" },
+    h("div", { class: "card-h" }, h("h2", { text: c.name || "New client" }), h("button", { class: "btn ghost danger", type: "button", onclick: () => { cfg.draft.clients.splice(i, 1); updateDirty(); renderSettings(); } }, icon("trash"), "Remove")),
+    h("div", { class: "fields" },
+      txtInput(c, "name", { label: "Name", path: at("name"), hint: "Shown in logs and the dashboard" }),
+      numInput(c, "ratePerMinute", { label: "Rate limit (requests per minute)", path: at("ratePerMinute"), min: 1, max: 100000 })),
+    h("div", { style: "margin-top:18px" }, h("div", { class: "sec-h", style: "margin-top:0", text: "Gateway key" }), h("div", { class: "keyline", style: "border:0;padding:0" }, left, right), h("span", { class: "ferr", "data-err": path })));
+}
+function clientsTab() {
+  const d = cfg.draft;
+  return [h("p", { class: "intro", text: "Each client gets its own gateway key and rate limit. Apps send the key as a Bearer token; upstream keys are never exposed to them." }), groupErr("clients"),
+    d.clients.length ? null : h("div", { class: "alert info", style: "margin-bottom:16px" }, icon("alert"), h("div", {}, h("b", { text: "No clients." }), " ", h("span", { text: "Authentication is off: anyone who can reach the gateway can use your upstream keys." }))),
+    h("div", { class: "stack" }, d.clients.map(clientRow)),
+    h("div", { style: "margin-top:16px" }, h("button", { class: "btn primary", type: "button", onclick: () => { cfg.draft.clients.push({ _id: ++uid, originalName: undefined, name: "", ratePerMinute: 60, key: { generate: true } }); updateDirty(); renderSettings(); } }, icon("plus"), "Add client"))];
+}
+
+/* ---------- balancer tab ---------- */
+function balancerTab() {
+  const d = cfg.draft, s = d.settings, paints = [];
+  const total = () => d.providers.reduce((a, p) => a + (+p.weight || 0), 0) || 1;
+  const rows = d.providers.map((p, i) => {
+    const path = `providers[${i}].weight`, bar = h("i", {}), share = h("span", { class: "mono" });
+    const range = h("input", { type: "range", min: 0.5, max: 10, step: 0.5, value: String(Math.min(10, +p.weight || 1)), "aria-label": `Weight of ${p.name}` });
+    const num = h("input", { class: "input", type: "number", min: 0.1, max: 1000, step: 0.1, value: String(p.weight), "aria-label": `Weight of ${p.name} (number)` });
+    const paint = () => { const pc = ((+p.weight || 0) / total()) * 100; share.textContent = `${pc.toFixed(pc < 10 ? 1 : 0)}%`; bar.style.width = pc + "%"; };
+    paints.push(paint);
+    range.addEventListener("input", () => { p.weight = +range.value; num.value = String(p.weight); clearErr(path); updateDirty(); paints.forEach((f) => f()); });
+    num.addEventListener("input", () => { p.weight = num.value === "" || isNaN(+num.value) ? "" : +num.value; if (p.weight !== "") range.value = String(Math.min(10, p.weight)); clearErr(path); updateDirty(); paints.forEach((f) => f()); });
+    paint();
+    return h("div", { class: "wrow" }, h("b", { class: "ellip", text: p.name || "New provider" }), range, h("div", {}, num, h("span", { class: "ferr", "data-err": path })),
+      h("div", { class: "share" }, h("div", { class: "t" }, h("span", { text: "Traffic share" }), share), h("div", { class: "track" }, bar)));
+  });
+  const sec = (label, obj, key, o) => numInput(obj, key, { label, scale: 1000, ...o });
+  return [
+    h("div", { class: "card" },
+      h("div", { class: "card-h" }, h("h2", { text: "Traffic distribution" })),
+      h("p", { class: "intro", style: "margin-bottom:6px", text: "Each request goes to the least-loaded provider that serves the model. Load is in-flight requests divided by max concurrent, divided by weight, so a higher weight takes proportionally more traffic. The share shown is what you would get when every provider is equally busy." }),
+      rows.length ? rows : h("div", { class: "empty", text: "Add a provider first" })),
+    h("div", { class: "card", style: "margin-top:20px" },
+      h("div", { class: "card-h" }, h("h2", { text: "Failover and limits" })),
+      h("div", { class: "fields" },
+        numInput(s, "maxAttempts", { label: "Max attempts", path: "settings.maxAttempts", min: 1, max: 20, hint: "Upstream tries per request, across providers and keys" }),
+        sec("Upstream timeout (seconds)", s, "upstreamTimeoutMs", { path: "settings.upstreamTimeoutMs", min: 1, max: 600, hint: "How long to wait for the response to start" }),
+        sec("Queue timeout (seconds)", s, "queueTimeoutMs", { path: "settings.queueTimeoutMs", min: 0.1, max: 600, step: 0.5, hint: "Longest a request waits for a free slot" }),
+        numInput(s.breaker, "failures", { label: "Breaker threshold", path: "settings.breaker.failures", min: 1, max: 100, hint: "Consecutive failures before a provider is skipped" }),
+        sec("Breaker cooldown (seconds)", s.breaker, "cooldownMs", { path: "settings.breaker.cooldownMs", min: 1, max: 3600, hint: "How long a failing provider is skipped" }),
+        sec("Key cooldown (seconds)", s, "keyCooldownMs", { path: "settings.keyCooldownMs", min: 1, max: 86400, hint: "Pause for a rate-limited key that sent no Retry-After" }))),
+  ];
+}
+
+/* ---------- general tab ---------- */
+function generalTab() {
+  const d = state.data;
+  const row = (name, desc, value) => h("div", { class: "setting" }, h("div", {}, h("div", { text: name }), h("div", { class: "d", text: desc })), typeof value === "string" ? h("b", { text: value }) : value);
+  return [
+    state.data.editable ? null : roAlert(),
+    h("div", { class: "grid halves" },
+      h("div", { class: "card" }, h("div", { class: "card-h" }, h("h2", { text: "Runtime" })), h("div", { class: "settings" },
+        row("Version", "From package.json", d.server.version), row("Node.js", "Runtime in use", d.server.node), row("Uptime", "Since the process started", dur(d.server.uptimeSec)),
+        row("Memory", "Resident set size", `${d.server.rssMb} MB`), row("Port", "Where the gateway listens (restart to change)", String(d.config.port)), row("Client authentication", "Gateway keys required on /v1", d.config.authEnabled ? "Enabled" : "Disabled"))),
+      h("div", { class: "card" }, h("div", { class: "card-h" }, h("h2", { text: "Access" })), h("div", { class: "settings" },
+        row("Admin key", "Set in config.json or the environment. It cannot be changed from here, so you can never lock yourself out.", chip("managed outside", "info")),
+        row("Config file", "Edits are saved here, and the previous version is kept as a .bak next to it", chip("config.json")))),
+    ),
+    h("div", { class: "card", style: "margin-top:20px" }, h("div", { class: "card-h" }, h("h2", { text: "Danger zone" })), h("div", { class: "settings" },
+      row("Reset statistics", "Clears counters, history and charts. Providers, keys and settings are not touched.", h("button", { class: "btn danger", type: "button", text: "Reset statistics…", onclick: resetStats })))),
+  ];
+}
+async function resetStats() {
+  if (!(await confirmModal("Reset statistics?", "Counters, the request history and the charts start from zero. This can't be undone.", "Reset", true))) return;
+  const { res } = await api("POST", "/admin/api/stats/reset");
+  toast(res.ok ? "Statistics reset" : "Could not reset", !res.ok); load();
+}
+
+/* ---------- render, save ---------- */
+const TABS = [["providers", "Providers"], ["clients", "Clients"], ["balancer", "Balancer"], ["general", "General"]];
+function renderSettings() {
+  const editable = state.data?.editable !== false, box = $("set-content");
+  if (!editable) cfg.tab = "general";
+  $("set-tabs").replaceChildren(...(editable ? TABS : TABS.slice(3)).map(([id, label]) => h("button", { class: "tab", type: "button", role: "tab", "aria-selected": String(cfg.tab === id), onclick: () => { cfg.tab = id; renderSettings(); } }, label,
+    cfg.draft && id === "providers" ? h("span", { class: "n", text: String(cfg.draft.providers.length) }) : cfg.draft && id === "clients" ? h("span", { class: "n", text: String(cfg.draft.clients.length) }) : null)));
+  const needDraft = editable && cfg.tab !== "general" && !cfg.draft;
+  if (!state.data || needDraft) {
+    box.replaceChildren(h("div", { class: "card" }, h("div", { class: "skeleton", style: "height:140px" })));
+    if (state.data && !cfg.failed) ensureConfig();
+  } else {
+    box.replaceChildren(...{ providers: providersTab, clients: clientsTab, balancer: balancerTab, general: generalTab }[cfg.tab]().flat().filter(Boolean));
+  }
+  paintErrors(); updateDirty();
+  if (cfg.scrollTo) {
+    box.querySelector(`[data-name="${CSS.escape(cfg.scrollTo)}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    cfg.scrollTo = null; cfg.openName = null;
+  }
+}
+
+async function save() {
+  if (cfg.saving || !isDirty()) return;
+  const extra = {};
+  if (cfg.orig.clients.length && !cfg.draft.clients.length) {
+    if (!(await confirmModal("Turn authentication off?", "With no client keys, anyone who can reach this gateway can use your upstream keys and quota.", "Remove all clients", true))) return;
+    extra.allowNoAuth = true;
+  }
+  cfg.saving = true; updateDirty();
+  const { res, json } = await api("PUT", "/admin/api/config", toPayload(cfg.draft, extra));
+  cfg.saving = false;
+  if (res.status === 422) {
+    const issues = json.error.issues; cfg.errors = {};
+    for (const it of issues) cfg.errors[it.path] ??= it.message;
+    const first = issues[0].path;
+    cfg.tab = first.startsWith("settings") ? "balancer" : first.startsWith("clients") ? "clients" : "providers";
+    renderSettings();
+    toast(issues.length === 1 ? issues[0].message : `Fix ${issues.length} problems before saving`, true);
+    document.querySelector("#set-content .field.bad, #set-content .ferr:not(:empty), #set-content .alert.err")?.scrollIntoView({ block: "center", behavior: "smooth" });
+    return;
+  }
+  if (!res.ok) { toast(json?.error?.message || "Could not save", true); return updateDirty(); }
+  cfg.errors = {}; cfg.orig = toDraft(json.config); cfg.draft = toDraft(json.config); cfg.open.clear();
+  renderSettings(); toast("Saved and applied to the running gateway"); load();
+  if (json.generated.length) modal({
+    title: json.generated.length > 1 ? "New client keys" : "New client key",
+    body: [h("p", { class: "muted", text: "Copy these now and hand them to the apps. They are stored in config.json, but this screen only shows them once." }),
+      ...json.generated.map((g) => h("div", { class: "genkey" }, h("div", { class: "row" }, h("b", { text: g.name }), h("button", { class: "btn", type: "button", onclick: () => copy(g.key, "Key") }, icon("copy"), "Copy")), h("span", { class: "mono", text: g.key })))],
+    actions: [{ label: "Done", value: "ok", kind: "primary" }],
+  });
+}
+function discard() { cfg.draft = clone(cfg.orig); cfg.errors = {}; renderSettings(); toast("Changes discarded"); }
+
+/* ---------- chrome & routing ---------- */
+function renderChrome(d) {
+  const down = d.providers.some((p) => p.breakerOpen), bad = d.providers.some((p) => provHealth(p) !== "ok");
+  $("side-dot").className = "dot static " + (down ? "bad" : bad ? "warn" : "");
+  $("side-status").textContent = down ? "Degraded" : bad ? "Needs attention" : "All systems normal";
+  $("side-meta").replaceChildren(h("span", { text: `v${d.server.version} · Node ${d.server.node.replace("v", "")}` }), h("span", { text: `Uptime ${dur(d.server.uptimeSec)}` }));
+}
+function renderAll() {
+  const d = state.data; if (!d) return;
+  renderChrome(d);
+  $("alerts").replaceChildren(...alertsFor(d).map(([k, t, s]) => h("div", { class: "alert " + k, role: "status" }, icon("alert"), h("div", {}, h("b", { text: t }), " ", h("span", { text: s })))));
+  renderKpis(d); renderChart(d); renderModels(d); renderOverviewLists(d); renderProviders(d);
+  // keep keyboard focus on a table row: don't rebuild the table under the user
+  if (!document.activeElement?.closest?.("tbody")) { renderClients(d); renderRequests(d); }
+  // the form tabs hold unsaved input, so only the read-only General tab (and the first load) re-render on refresh
+  if (state.route === "settings" && (cfg.tab === "general" || (!cfg.draft && !cfg.failed))) renderSettings(); else updateDirty();
+}
+function go(route) {
+  if (route === "config") route = "settings";
+  if (!ROUTES[route]) route = "overview";
+  state.route = route;
+  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.dataset.page === route));
+  document.querySelectorAll(".nav-item").forEach((a) => (a.dataset.route === route ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
+  $("page-title").textContent = ROUTES[route][0]; $("page-sub").textContent = ROUTES[route][1];
+  document.title = `${ROUTES[route][0]} · llm-gateway`; window.scrollTo(0, 0);
+  if (route === "settings") { cfg.failed = false; renderSettings(); } else updateDirty();
+}
+
+/* ---------- data loop ---------- */
+function show(authed) { $("login").hidden = authed; $("app").hidden = !authed; }
+function setLive(kind, text) { $("live-dot").className = "dot" + (kind ? " " + kind : ""); $("live-text").textContent = text; }
+function tick() {
+  if (!ss.get(KEY)) return;
+  if (+$("interval").value === 0) return setLive("off", "Paused");
+  if (state.lastOk) { const s = Math.round((Date.now() - state.lastOk) / 1000); setLive("", s < 2 ? "Live" : `Live · ${s}s ago`); }
+}
+async function load(manual) {
+  const key = ss.get(KEY); if (!key) return show(false);
+  if (state.loading) return; state.loading = true; $("refresh").classList.add("spin");
+  try {
+    const res = await fetch("/admin/api/overview", { headers: { authorization: "Bearer " + key }, cache: "no-store" });
+    if (res.status === 401 || res.status === 429) {
+      ss.del(KEY); show(false); $("login-error").textContent = res.status === 429 ? "Too many failed attempts. Try again in a minute." : "That admin key is not valid."; return;
+    }
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    state.data = await res.json(); state.lastOk = Date.now(); show(true); renderAll(); tick();
+    if (manual) toast("Refreshed");
+  } catch {
+    show(true); setLive("bad", "Connection lost"); if (manual) toast("Could not reach the gateway", true);
+  } finally { state.loading = false; setTimeout(() => $("refresh").classList.remove("spin"), 350); }
+}
+function schedule() { clearInterval(state.timer); const every = +$("interval").value; if (every) state.timer = setInterval(() => { if (!document.hidden) load(); }, every); tick(); }
+
+/* ---------- events ---------- */
+function toggleTheme() { const next = document.documentElement.dataset.theme === "light" ? "dark" : "light"; document.documentElement.dataset.theme = next; prefs.set("theme", next); }
+function syncRange() { document.querySelectorAll("#range button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.range === state.range))); }
+function bind() {
+  $("login-form").addEventListener("submit", (e) => { e.preventDefault(); ss.set(KEY, $("key").value.trim()); $("key").value = ""; $("login-error").textContent = ""; load(); });
+  $("logout").addEventListener("click", () => { ss.del(KEY); state.lastOk = 0; state.data = null; cfg.draft = cfg.orig = null; cfg.errors = {}; closeDrawer(); show(false); });
+  $("refresh").addEventListener("click", () => load(true));
+  $("theme").addEventListener("click", toggleTheme);
+  $("interval").addEventListener("change", () => { prefs.set("interval", $("interval").value); schedule(); });
+  $("range").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; state.range = +b.dataset.range; state.hover = -1; prefs.set("range", state.range); syncRange(); if (state.data) renderChart(state.data); });
+  const wrap = $("chart-wrap"); wrap.addEventListener("mousemove", chartHover); wrap.addEventListener("mouseleave", chartLeave);
+  wrap.addEventListener("touchstart", (e) => chartHover(e.touches[0]), { passive: true }); wrap.addEventListener("touchmove", (e) => chartHover(e.touches[0]), { passive: true });
+  $("f-q").addEventListener("input", (e) => { state.f.q = e.target.value; renderRequests(state.data); });
+  $("f-status").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { state.f.status = b.dataset.v; renderRequests(state.data); } });
+  for (const k of ["model", "provider", "client"]) $("f-" + k).addEventListener("change", (e) => { state.f[k] = e.target.value; renderRequests(state.data); });
+  $("f-clear").addEventListener("click", clearFilters); $("export").addEventListener("click", exportCsv);
+  $("ov-errors-all").addEventListener("click", () => viewRequests({ status: "err" }));
+  $("save").addEventListener("click", save); $("discard").addEventListener("click", discard);
+  window.addEventListener("beforeunload", (e) => { if (isDirty()) { e.preventDefault(); e.returnValue = ""; } });
+  $("scrim").addEventListener("click", closeDrawer); $("drawer-close").addEventListener("click", closeDrawer);
+  window.addEventListener("hashchange", () => go(location.hash.slice(1)));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && ss.get(KEY)) load(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { if ($("drawer").classList.contains("on")) closeDrawer(); else if (document.activeElement === $("f-q")) document.activeElement.blur(); return; }
+    if (e.metaKey || e.ctrlKey || e.altKey || !state.data || e.target.matches("input, select, textarea")) return;
+    if (e.key === "/") { e.preventDefault(); location.hash = "requests"; setTimeout(() => $("f-q").focus(), 0); }
+    else if (e.key === "r") load(true); else if (e.key === "t") toggleTheme(); else if (/^[1-5]$/.test(e.key)) location.hash = Object.keys(ROUTES)[+e.key - 1];
+  });
+  $("drawer").addEventListener("keydown", (e) => { // focus trap while open
+    if (e.key !== "Tab") return;
+    const f = [...$("drawer").querySelectorAll("button")], first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+}
+
+(function init() {
+  document.querySelectorAll("[data-icon]").forEach((el) => el.prepend(icon(el.dataset.icon)));
+  document.documentElement.dataset.theme = prefs.get("theme", matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  $("interval").value = prefs.get("interval", "5000"); syncRange(); bind();
+  go(location.hash.slice(1)); setInterval(tick, 1000); schedule(); load();
+})();
+</script>
+</body>
+</html>

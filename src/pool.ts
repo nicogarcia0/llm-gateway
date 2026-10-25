@@ -1,7 +1,7 @@
-import type { Config, ProviderConfig } from "./config.ts";
+import { mask, type Config, type ProviderConfig } from "./config.ts";
 import { Semaphore } from "./limits.ts";
 
-type KeyState = { value: string; cooldownUntil: number };
+type KeyState = { value: string; cooldownUntil: number; uses: number };
 
 export class Provider {
   readonly name: string;
@@ -9,6 +9,8 @@ export class Provider {
   readonly weight: number;
   readonly models: string[];
   readonly limiter: Semaphore;
+  /** Same config + breaker settings => same signature, so a config reload can keep this instance and its live state. */
+  readonly signature: string;
   private keys: KeyState[];
   private nextKeyIndex = 0;
   private failures = 0;
@@ -17,12 +19,24 @@ export class Provider {
 
   constructor(cfg: ProviderConfig, breaker: Config["breaker"]) {
     this.breaker = breaker;
+    this.signature = Provider.signature(cfg, breaker);
     this.name = cfg.name;
     this.baseUrl = cfg.baseUrl.replace(/\/$/, "");
     this.weight = cfg.weight ?? 1;
     this.models = cfg.models ?? [];
     this.limiter = new Semaphore(cfg.maxConcurrent ?? 8, cfg.queueSize ?? 32);
-    this.keys = (cfg.keys ?? []).map((value) => ({ value, cooldownUntil: 0 }));
+    this.keys = (cfg.keys ?? []).map((value) => ({ value, cooldownUntil: 0, uses: 0 }));
+  }
+
+  static signature(cfg: ProviderConfig, breaker: Config["breaker"]) {
+    return JSON.stringify([cfg, breaker]);
+  }
+
+  /** Close the breaker and clear every key cooldown (admin action). */
+  reset() {
+    this.failures = 0;
+    this.openUntil = 0;
+    for (const k of this.keys) k.cooldownUntil = 0;
   }
 
   get breakerOpen() {
@@ -31,6 +45,24 @@ export class Provider {
 
   get keyCount() {
     return this.keys.length;
+  }
+
+  get consecutiveFailures() {
+    return this.failures;
+  }
+
+  get breakerRemainingSec() {
+    return Math.max(0, Math.ceil((this.openUntil - Date.now()) / 1000));
+  }
+
+  /** Masked view of the pool for the admin dashboard; never exposes full keys. */
+  keyStatus() {
+    const now = Date.now();
+    return this.keys.map((k) => ({
+      key: mask(k.value),
+      uses: k.uses,
+      cooldownSec: Math.max(0, Math.ceil((k.cooldownUntil - now) / 1000)),
+    }));
   }
 
   supports(model: string) {
@@ -49,6 +81,7 @@ export class Provider {
       const key = this.keys[idx];
       if (key.cooldownUntil <= now) {
         this.nextKeyIndex = (idx + 1) % this.keys.length;
+        key.uses++;
         return { value: key.value, cooldown: (ms) => (key.cooldownUntil = Date.now() + ms) };
       }
     }
