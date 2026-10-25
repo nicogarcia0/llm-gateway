@@ -36,6 +36,7 @@ export function buildOverview(config: Config, providers: Provider[], stats: Stat
     providers: providers.map((p) => ({
       name: p.name,
       baseUrl: p.baseUrl,
+      format: p.format,
       weight: p.weight,
       models: p.models,
       maxConcurrent: p.limiter.max,

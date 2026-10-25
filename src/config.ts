@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { AdapterConfig, Format } from "./adapters.ts";
 
 export type ProviderConfig = {
   name: string;
@@ -8,6 +9,10 @@ export type ProviderConfig = {
   maxConcurrent?: number;
   queueSize?: number;
   models?: string[];
+  /** API the provider speaks. Default "openai" (passthrough); the others are translated by an adapter. */
+  format?: Format;
+  /** Overrides the preset of anthropic/gemini, or the whole mapping for "custom". */
+  adapter?: AdapterConfig;
 };
 
 export type ClientKeyConfig = {

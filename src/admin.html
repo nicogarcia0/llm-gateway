@@ -258,6 +258,14 @@ dialog.modal::backdrop { background: #000a; }
 .genkey .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; } .genkey .mono { overflow-wrap: anywhere; color: var(--ok); }
 @media (max-width: 860px) { .savebar { bottom: 74px; flex-wrap: wrap; } .wrow { grid-template-columns: 1fr 96px; } .wrow .share { grid-column: 1 / -1; } .wrow input[type="range"] { grid-column: 1; } .presets { grid-template-columns: 1fr; } }
 
+.field textarea.input, textarea.input { height: auto; min-height: 44px; padding: 10px 12px; line-height: 1.5; resize: vertical; width: 100%; }
+.code { font-family: var(--mono); font-size: 12.5px; white-space: pre; overflow: auto; }
+.codeblock { margin: 8px 0 0; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); font: 12.5px/1.55 var(--mono); overflow: auto; max-height: 320px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dbg { margin-top: 12px; } .dbg > summary { cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 560; padding: 4px 0; } .dbg > summary:hover { color: var(--text); }
+.reply { margin-top: 12px; padding: 12px 14px; border-radius: 11px; background: var(--ok-bg); border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); }
+.check { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; } .check input { width: 17px; height: 17px; accent-color: var(--accent); }
+.adapter { padding-top: 22px; border-top: 1px dashed var(--border-strong); }
+
 /* ---------- login ---------- */
 .login { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
 .login form { width: min(400px, 100%); padding: 28px; }
@@ -617,7 +625,7 @@ function renderProviders(d) {
   $("providers").replaceChildren(...d.providers.map((p) => {
     const load = p.maxConcurrent ? Math.min(100, (p.inflight / p.maxConcurrent) * 100) : 0;
     return h("section", { class: "card" },
-      h("div", { class: "prov-h" }, h("div", {}, h("div", { class: "name", text: p.name }), h("div", { class: "url", text: p.baseUrl })), h("div", { class: "chips" }, chip(`weight ${p.weight}`), provChip(p))),
+      h("div", { class: "prov-h" }, h("div", {}, h("div", { class: "name", text: p.name }), h("div", { class: "url", text: p.baseUrl })), h("div", { class: "chips" }, p.format !== "openai" ? chip(FORMAT_LABEL[p.format] || p.format, "info") : null, chip(`weight ${p.weight}`), provChip(p))),
       h("div", { class: "meter" }, h("div", { class: "t" }, h("span", { text: "Concurrency" }), h("span", { text: `${p.inflight} / ${p.maxConcurrent} slots · ${Math.round(load)}%` })), h("div", { class: "track" }, h("i", { class: load > 85 ? "w" : "", style: `width:${load}%` }))),
       h("div", { class: "stats3" }, h("div", {}, h("b", { text: `${p.queued}/${p.queueSize}` }), h("span", { text: "Queued" })), h("div", {}, h("b", { text: nf.format(p.served) }), h("span", { text: "Served" })), h("div", {}, h("b", { text: String(p.consecutiveFailures) }), h("span", { text: "Consecutive fails" }))),
       h("div", { class: "sec-h", text: "Models" }),
@@ -747,20 +755,20 @@ const confirmModal = async (title, text, label, danger) => (await modal({ title,
 
 /* ---------- draft model ---------- */
 // The browser never holds a secret: existing keys are {keep: position, view: masked}, new ones are {value}.
-const cfg = { orig: null, draft: null, tab: "providers", errors: {}, open: new Set(), openName: null, scrollTo: null, saving: false, loading: false, failed: false };
+const cfg = { orig: null, draft: null, tab: "providers", errors: {}, open: new Set(), openName: null, scrollTo: null, saving: false, loading: false, failed: false, meta: null, bad: new Set() };
 let uid = 0;
 const clone = (v) => JSON.parse(JSON.stringify(v));
 function toDraft(desc) {
   return {
     settings: clone(desc.settings),
-    providers: desc.providers.map((p) => ({ _id: ++uid, originalName: p.name, name: p.name, baseUrl: p.baseUrl, weight: p.weight, maxConcurrent: p.maxConcurrent, queueSize: p.queueSize, models: [...p.models], keys: p.keys.map((view, i) => ({ keep: i, view })) })),
+    providers: desc.providers.map((p) => ({ _id: ++uid, originalName: p.name, name: p.name, baseUrl: p.baseUrl, weight: p.weight, maxConcurrent: p.maxConcurrent, queueSize: p.queueSize, models: [...p.models], format: p.format || "openai", adapter: p.adapter ? clone(p.adapter) : null, keys: p.keys.map((view, i) => ({ keep: i, view })) })),
     clients: desc.clients.map((c) => ({ _id: ++uid, originalName: c.name, name: c.name, ratePerMinute: c.ratePerMinute, key: { keep: true, view: c.key } })),
   };
 }
 function toPayload(d, extra) {
   return {
     settings: d.settings,
-    providers: d.providers.map((p) => ({ originalName: p.originalName, name: p.name, baseUrl: p.baseUrl, weight: p.weight, maxConcurrent: p.maxConcurrent, queueSize: p.queueSize, models: p.models, keys: p.keys.filter((k) => k.keep !== undefined || k.value.trim()).map((k) => (k.keep !== undefined ? { keep: k.keep } : { value: k.value })) })), // blank new-key rows are ignored
+    providers: d.providers.map((p) => ({ originalName: p.originalName, name: p.name, baseUrl: p.baseUrl, weight: p.weight, maxConcurrent: p.maxConcurrent, queueSize: p.queueSize, models: p.models, format: p.format, adapter: p.format === "openai" ? undefined : p.adapter || undefined, keys: p.keys.filter((k) => k.keep !== undefined || k.value.trim()).map((k) => (k.keep !== undefined ? { keep: k.keep } : { value: k.value })) })), // blank new-key rows are ignored
     clients: d.clients.map((c) => ({ originalName: c.originalName, name: c.name, ratePerMinute: c.ratePerMinute, key: c.key.keep ? { keep: true } : c.key.generate ? { generate: true } : { value: c.key.value } })),
     ...extra,
   };
@@ -777,7 +785,7 @@ async function ensureConfig(force) {
   try {
     const { res, json } = await api("GET", "/admin/api/config");
     if (!res.ok) throw new Error(json?.error?.message || "HTTP " + res.status);
-    cfg.orig = toDraft(json); cfg.draft = toDraft(json); cfg.failed = false;
+    cfg.orig = toDraft(json); cfg.draft = toDraft(json); cfg.meta = json.meta; cfg.failed = false;
   } catch (e) { cfg.failed = true; toast("Could not load settings: " + e.message, true); }
   finally { cfg.loading = false; renderSettings(); }
 }
@@ -808,19 +816,20 @@ const PRESETS = [
   { label: "Groq", id: "groq", baseUrl: "https://api.groq.com/openai/v1" }, { label: "Together AI", id: "together", baseUrl: "https://api.together.xyz/v1" },
   { label: "Mistral", id: "mistral", baseUrl: "https://api.mistral.ai/v1" }, { label: "DeepSeek", id: "deepseek", baseUrl: "https://api.deepseek.com/v1" },
   { label: "Ollama (local)", id: "ollama", baseUrl: "http://localhost:11434/v1", noKey: true }, { label: "LM Studio (local)", id: "lmstudio", baseUrl: "http://localhost:1234/v1", noKey: true },
-  { label: "Custom", id: "provider", baseUrl: "" },
+  { label: "Anthropic (Claude)", id: "claude", baseUrl: "https://api.anthropic.com/v1", format: "anthropic" }, { label: "Google Gemini", id: "gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta", format: "gemini" },
+  { label: "Custom API (own format)", id: "custom-api", baseUrl: "", format: "custom" }, { label: "OpenAI-compatible (other)", id: "provider", baseUrl: "" },
 ];
 async function addProvider() {
   const choice = await modal({
     title: "Add a provider",
-    body: [h("p", { class: "muted", text: "Pick a preset or start from scratch. You can change everything afterwards." }),
+    body: [h("p", { class: "muted", text: "Pick a preset or start from scratch. APIs that do not speak OpenAI (Anthropic, Gemini or your own) are translated for you. You can change everything afterwards." }),
       h("div", { class: "presets" }, ...PRESETS.map((pr, i) => h("button", { class: "preset", type: "button", onclick: () => $("modal").close(String(i)) }, h("b", { text: pr.label }), h("span", { class: "mono muted ellip", text: pr.baseUrl || "Any OpenAI-compatible API" }))))],
     actions: [{ label: "Cancel", value: "" }],
   });
   if (choice === "") return;
   const pr = PRESETS[+choice], taken = new Set(cfg.draft.providers.map((x) => x.name));
   let name = pr.id, n = 2; while (taken.has(name)) name = `${pr.id}-${n++}`;
-  const p = { _id: ++uid, originalName: undefined, name, baseUrl: pr.baseUrl, weight: 1, maxConcurrent: pr.noKey ? 2 : 8, queueSize: 32, models: [], keys: pr.noKey ? [] : [{ value: "" }] };
+  const p = { _id: ++uid, originalName: undefined, name, baseUrl: pr.baseUrl, weight: 1, maxConcurrent: pr.noKey ? 2 : 8, queueSize: 32, models: [], format: pr.format || "openai", adapter: pr.format === "custom" ? clone(cfg.meta.starter) : null, keys: pr.noKey ? [] : [{ value: "" }] };
   cfg.draft.providers.push(p); cfg.open.add(p._id); cfg.tab = "providers"; renderSettings();
   document.querySelector(`#set-content [data-id="${p._id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
@@ -898,6 +907,127 @@ function editProvider(name) {
   if (state.route === "settings") renderSettings(); else location.hash = "settings";
 }
 
+/* ---------- API format and adapter editor ---------- */
+const FORMAT_LABEL = { openai: "OpenAI-compatible", anthropic: "Anthropic (Claude)", gemini: "Google Gemini", custom: "Custom API" };
+const FORMAT_URL = { anthropic: "https://api.anthropic.com/v1", gemini: "https://generativelanguage.googleapis.com/v1beta" };
+
+function setFormat(p, f) {
+  p.format = f;
+  p.adapter = f === "custom" ? clone(cfg.meta.starter) : null;
+  if (f === "custom" && !p.models.length) p.models = [];
+}
+function formatField(p, i) {
+  const sel = h("select", { class: "input", "aria-label": "API format" }, ...Object.entries(FORMAT_LABEL).map(([v, l]) => h("option", { value: v, text: l })));
+  sel.value = p.format;
+  sel.addEventListener("change", () => { setFormat(p, sel.value); cfg.open.add(p._id); updateDirty(); renderSettings(); });
+  return field("API format", sel, { path: `providers[${i}].format`, hint: p.format === "openai" ? "Requests pass through untouched" : "The gateway translates OpenAI requests and replies for this API" });
+}
+
+// nested get/set on the adapter object; an empty optional value removes the key
+const getIn = (o, path) => path.split(".").reduce((x, k) => (x == null ? undefined : x[k]), o);
+function setIn(o, path, value, keepEmpty) {
+  const keys = path.split("."); let cur = o;
+  for (const k of keys.slice(0, -1)) cur = cur[k] ??= {};
+  if (value === "" && !keepEmpty) delete cur[keys.at(-1)]; else cur[keys.at(-1)] = value;
+}
+function aInput(p, i, path, o) {
+  const a = p.adapter, num = o.number;
+  const inp = h("input", { class: "input" + (o.mono ? " mono" : ""), type: num ? "number" : "text", value: getIn(a, path) === undefined ? "" : String(getIn(a, path)), spellcheck: "false", autocomplete: "off", placeholder: o.placeholder, min: num ? 1 : undefined });
+  inp.addEventListener("input", () => { setIn(a, path, num ? (inp.value === "" ? "" : +inp.value) : inp.value, o.keepEmpty); clearErr(`providers[${i}].adapter.${path}`); updateDirty(); });
+  return field(o.label, inp, { path: `providers[${i}].adapter.${path}`, hint: o.hint, wide: o.wide });
+}
+function aJson(p, i, path, o) {
+  const a = p.adapter, full = `providers[${i}].adapter.${path}`;
+  const ta = h("textarea", { class: "input code", rows: String(o.rows || 4), spellcheck: "false", "aria-label": o.label });
+  ta.value = getIn(a, path) === undefined ? "" : JSON.stringify(getIn(a, path), null, 2);
+  ta.addEventListener("input", () => {
+    try {
+      const v = ta.value.trim() === "" ? undefined : JSON.parse(ta.value);
+      if (v === undefined) setIn(a, path, ""); else setIn(a, path, v);
+      cfg.bad.delete(full); clearErr(full);
+    } catch (e) { cfg.bad.add(full); cfg.errors[full] = "Not valid JSON yet: " + e.message; paintErrors(); }
+    updateDirty();
+  });
+  return { ta, node: field(o.label, ta, { path: full, hint: o.hint, wide: true }) };
+}
+
+function renderChatTest(out, r) {
+  if (!r) return out.replaceChildren(chip("No answer", "err"));
+  const pre = (text) => h("pre", { class: "codeblock", text });
+  out.replaceChildren(...[
+    h("div", { class: "testout" }, r.ok ? chip(`It works · ${r.status} · ${ms(r.ms)}`, "ok") : chip(r.status ? `HTTP ${r.status}` : "Failed", "err"), r.error ? h("span", { class: "muted", text: r.error }) : null),
+    r.reply != null ? h("div", { class: "reply" }, h("div", { class: "sec-h", style: "margin:0 0 6px", text: "Reply, as your clients receive it" }), h("div", { text: r.reply })) : null,
+    r.sent ? h("details", { class: "dbg" }, h("summary", { text: "Request sent to the provider" }), h("div", { class: "mono muted", text: `POST ${r.sent.url}` }), pre(Object.entries(r.sent.headers).map(([k, v]) => `${k}: ${v}`).join("\n")), pre(r.sent.body)) : null,
+    r.received ? h("details", { class: "dbg", open: r.ok ? null : true }, h("summary", { text: "Raw answer from the provider" }), pre(r.received)) : null,
+    r.openai ? h("details", { class: "dbg" }, h("summary", { text: "Translated to OpenAI format" }), pre(JSON.stringify(r.openai, null, 2))) : null,
+  ].filter(Boolean));
+}
+async function testChat(p, out) {
+  out.replaceChildren(chip("Sending…"));
+  const first = p.keys.find((k) => k.keep !== undefined || (k.value && k.value.trim()));
+  const key = !first ? undefined : first.keep !== undefined ? { keep: first.keep } : first.value;
+  const { json } = await api("POST", "/admin/api/test-chat", { originalName: p.originalName, baseUrl: p.baseUrl, format: p.format, adapter: p.adapter || undefined, model: p._testModel || p.models[0] || "", key });
+  renderChatTest(out, json);
+}
+
+function adapterSection(p, i) {
+  const wrap = h("div", { class: "adapter" }), a = p.adapter;
+  const out = h("div", { class: "stack" });
+  const model = h("input", { class: "input", placeholder: "Model to test with", value: p._testModel || p.models[0] || "", "aria-label": "Model to test with", spellcheck: "false" });
+  model.addEventListener("input", () => { p._testModel = model.value; });
+  const tester = h("div", { class: "actions", style: "margin-top:18px" }, h("div", { style: "width:min(260px,100%)" }, model), h("button", { class: "btn", type: "button", onclick: () => testChat(p, out) }, icon("bolt"), "Send test message"), h("span", { class: "muted", style: "font-size:12.5px", text: "Uses the first key, even before you save." }));
+
+  if (p.format !== "custom" && !a) {
+    const preset = cfg.meta.presets[p.format];
+    wrap.append(h("div", { class: "sec-h", style: "margin-top:0", text: "Request and response format" }),
+      h("p", { class: "hint", style: "margin:0 0 10px", text: `Built-in adapter for ${FORMAT_LABEL[p.format]}. Your clients keep using the OpenAI API; the gateway rewrites the request, calls ${FORMAT_URL[p.format]}${preset.path.replace(/\{\{model\}\}/g, "<model>")} and turns the answer back into an OpenAI reply, including streaming. Text chat only: requests with tools, images or other endpoints go to OpenAI-compatible providers.` }),
+      h("details", { class: "dbg" }, h("summary", { text: "Show the mapping" }), h("pre", { class: "codeblock", text: JSON.stringify(preset, null, 2) })),
+      h("div", { class: "actions", style: "margin-top:12px" }, h("button", { class: "btn", type: "button", onclick: () => { p.adapter = clone(preset); cfg.open.add(p._id); updateDirty(); renderSettings(); } }, icon("sliders"), "Customize mapping")),
+      tester, out);
+    return wrap;
+  }
+
+  const vars = Object.entries(cfg.meta.variables);
+  const req = aJson(p, i, "request", { label: "Request body (JSON template)", rows: 12, hint: "What the provider expects. Use {{variables}}; a variable the client did not send removes its key." });
+  const chips = h("div", { class: "chips", style: "margin-top:6px" }, ...vars.map(([n, d]) => h("button", { class: "chip pick mono", type: "button", title: d, text: `{{${n}}}`, onclick: () => { const ta = req.ta, s = ta.selectionStart ?? ta.value.length; ta.setRangeText(`"{{${n}}}"`, s, ta.selectionEnd ?? s, "end"); ta.dispatchEvent(new Event("input")); ta.focus(); } })));
+  const streamOn = !!a.streaming;
+  const stream = h("input", { type: "checkbox", id: `stream-${p._id}` });
+  stream.checked = streamOn;
+  stream.addEventListener("change", () => { a.streaming = stream.checked ? { text: "", finishReason: "" } : null; updateDirty(); renderSettings(); });
+
+  wrap.append(
+    h("div", { class: "sec-h", style: "margin-top:0", text: p.format === "custom" ? "Request and response format" : `Request and response format (customized ${FORMAT_LABEL[p.format]} preset)` }),
+    p.format === "custom" ? h("p", { class: "hint", style: "margin:0 0 14px", text: "Describe how this API wants to be called and where it puts the answer. Your clients keep using the OpenAI API; the gateway translates both ways. Build it, then press Send test message to see exactly what is sent and received." }) : h("div", { class: "actions", style: "margin-bottom:14px" }, h("button", { class: "btn", type: "button", onclick: () => { p.adapter = null; updateDirty(); renderSettings(); } }, icon("refresh"), "Back to the built-in preset")),
+    h("div", { class: "fields" },
+      aInput(p, i, "path", { label: "Path", mono: true, wide: true, placeholder: "/v1/messages", hint: "Added to the base URL. May contain {{model}}, which is URL-encoded." }),
+      aInput(p, i, "auth.header", { label: "Key goes in header", mono: true, placeholder: "authorization", hint: "e.g. Authorization or x-api-key" }),
+      aInput(p, i, "auth.scheme", { label: "Key prefix", mono: true, keepEmpty: true, placeholder: "Bearer", hint: "Empty sends the bare key" }),
+      aInput(p, i, "defaults.max_tokens", { label: "Default max tokens", number: true, hint: "Used when the client sends none" })),
+    h("div", { style: "margin-top:16px" }, aJson(p, i, "headers", { label: "Extra headers (JSON)", rows: 3, hint: 'Static values only, e.g. {"anthropic-version": "2023-06-01"}. Put keys in Upstream keys, not here.' }).node),
+    h("div", { style: "margin-top:16px" }, req.node, chips),
+    h("div", { class: "sec-h", style: "margin:22px 0 10px", text: "Reading the answer" }),
+    h("p", { class: "hint", style: "margin:0 0 12px", text: "Paths into the provider's JSON, like content[0].text. [*] joins every element, e.g. content[*].text." }),
+    h("div", { class: "fields" },
+      aInput(p, i, "response.text", { label: "Reply text *", mono: true, placeholder: "choices[0].text" }),
+      aInput(p, i, "response.finishReason", { label: "Why it stopped", mono: true, placeholder: "stop_reason" }),
+      aInput(p, i, "response.promptTokens", { label: "Prompt tokens", mono: true, placeholder: "usage.input_tokens" }),
+      aInput(p, i, "response.completionTokens", { label: "Completion tokens", mono: true, placeholder: "usage.output_tokens" }),
+      aInput(p, i, "response.id", { label: "Response id", mono: true }),
+      aInput(p, i, "response.model", { label: "Model name", mono: true }),
+      aInput(p, i, "response.error", { label: "Error message", mono: true, placeholder: "error.message", hint: "Shown to clients when the provider rejects a request" })),
+    h("div", { style: "margin-top:16px" }, aJson(p, i, "response.finishMap", { label: "Stop reasons (JSON, optional)", rows: 3, hint: 'Maps the provider\'s values to stop / length / content_filter, e.g. {"end_turn": "stop"}. Common values are already known.' }).node),
+    h("div", { class: "sec-h", style: "margin:22px 0 10px", text: "Streaming" }),
+    h("label", { class: "check" }, stream, h("span", { text: "This API can stream (server-sent events)" })),
+    streamOn
+      ? h("div", { class: "fields", style: "margin-top:14px" },
+          aInput(p, i, "streaming.path", { label: "Stream path (optional)", mono: true, wide: true, hint: "Only if streaming uses another path. Default: the same path." }),
+          aInput(p, i, "streaming.text", { label: "Text in each event *", mono: true, placeholder: "delta.text" }),
+          aInput(p, i, "streaming.finishReason", { label: "Why it stopped", mono: true, placeholder: "delta.stop_reason" }))
+      : h("p", { class: "hint", style: "margin:8px 0 0", text: "Without streaming, requests with stream: true still work: the full reply is delivered in one piece." }),
+    tester, out);
+  return wrap;
+}
+
 function providerCard(p, i) {
   const live = p.originalName && state.data.providers.find((x) => x.name === p.originalName);
   const hasErr = Object.keys(cfg.errors).some((k) => k.startsWith(`providers[${i}]`));
@@ -907,19 +1037,21 @@ function providerCard(p, i) {
   const body = h("div", { class: "pbody" },
     h("div", { class: "fields" },
       txtInput(p, "name", { label: "Name", path: at("name"), hint: "Used in logs, metrics and the x-gateway-provider header", onInput: () => { title.textContent = p.name || "New provider"; } }),
+      formatField(p, i),
       numInput(p, "weight", { label: "Weight", path: at("weight"), min: 0.1, max: 1000, step: 0.1, hint: "Higher takes proportionally more traffic" }),
-      txtInput(p, "baseUrl", { label: "Base URL", path: at("baseUrl"), wide: true, placeholder: "https://api.openai.com/v1", hint: "Any OpenAI-compatible API, including the /v1 part", onInput: () => { sub.textContent = p.baseUrl; } }),
+      txtInput(p, "baseUrl", { label: "Base URL", path: at("baseUrl"), wide: true, placeholder: "https://api.openai.com/v1", hint: p.format === "openai" ? "Any OpenAI-compatible API, including the /v1 part" : p.format === "custom" ? "Where the API lives. The path below is added to this" : "Usually " + FORMAT_URL[p.format], onInput: () => { sub.textContent = p.baseUrl; } }),
       numInput(p, "maxConcurrent", { label: "Max concurrent", path: at("maxConcurrent"), min: 1, max: 1000, hint: "Requests in flight at once" }),
       numInput(p, "queueSize", { label: "Queue size", path: at("queueSize"), min: 0, max: 10000, hint: "How many can wait before it answers 503" })),
     h("div", {}, h("div", { class: "sec-h", text: "Models" }), models, h("div", { class: "hint", style: "margin-top:6px", text: "Only these models are routed here. Leave empty to serve any model." })),
     h("div", {}, h("div", { class: "sec-h", text: "Upstream keys" }), keysSection(p, i), h("div", { class: "hint", style: "margin-top:8px", text: "Requests rotate across keys and a rate-limited key rests on its own. Paste a key, or reference an environment variable with env:NAME." })),
+    p.format !== "openai" ? adapterSection(p, i) : null,
     h("div", { class: "actions" },
-      h("button", { class: "btn", type: "button", onclick: () => testProvider(p, out) }, icon("bolt"), "Test connection"), out,
+      p.format === "openai" ? h("button", { class: "btn", type: "button", onclick: () => testProvider(p, out) }, icon("bolt"), "Test connection") : null, p.format === "openai" ? out : null,
       h("span", { class: "spacer" }),
       live && provHealth(live) !== "ok" ? h("button", { class: "btn", type: "button", onclick: () => resetProvider(p.originalName) }, icon("refresh"), "Reset breaker") : null,
       h("button", { class: "btn danger", type: "button", onclick: () => { cfg.draft.providers.splice(i, 1); updateDirty(); renderSettings(); } }, icon("trash"), "Remove provider")));
   const det = h("details", { class: "pcard", "data-name": p.originalName || "", "data-id": p._id, open: cfg.open.has(p._id) || hasErr || (p.originalName && cfg.openName === p.originalName) ? true : null },
-    h("summary", {}, h("div", { class: "ps-main" }, title, sub), h("div", { class: "chips" }, !p.originalName ? chip("new", "info") : live ? provChip(live) : null), icon("chevron")), body);
+    h("summary", {}, h("div", { class: "ps-main" }, title, sub), h("div", { class: "chips" }, p.format !== "openai" ? chip(FORMAT_LABEL[p.format]) : null, !p.originalName ? chip("new", "info") : live ? provChip(live) : null), icon("chevron")), body);
   det.addEventListener("toggle", () => (det.open ? cfg.open.add(p._id) : cfg.open.delete(p._id)));
   return det;
 }
@@ -1022,6 +1154,8 @@ async function resetStats() {
 /* ---------- render, save ---------- */
 const TABS = [["providers", "Providers"], ["clients", "Clients"], ["balancer", "Balancer"], ["general", "General"]];
 function renderSettings() {
+  for (const k of cfg.bad) delete cfg.errors[k];
+  cfg.bad.clear();
   const editable = state.data?.editable !== false, box = $("set-content");
   if (!editable) cfg.tab = "general";
   $("set-tabs").replaceChildren(...(editable ? TABS : TABS.slice(3)).map(([id, label]) => h("button", { class: "tab", type: "button", role: "tab", "aria-selected": String(cfg.tab === id), onclick: () => { cfg.tab = id; renderSettings(); } }, label,
@@ -1042,6 +1176,7 @@ function renderSettings() {
 
 async function save() {
   if (cfg.saving || !isDirty()) return;
+  if (cfg.bad.size) return toast("Fix the JSON marked in red before saving", true);
   const extra = {};
   if (cfg.orig.clients.length && !cfg.draft.clients.length) {
     if (!(await confirmModal("Turn authentication off?", "With no client keys, anyone who can reach this gateway can use your upstream keys and quota.", "Remove all clients", true))) return;
@@ -1061,7 +1196,7 @@ async function save() {
     return;
   }
   if (!res.ok) { toast(json?.error?.message || "Could not save", true); return updateDirty(); }
-  cfg.errors = {}; cfg.orig = toDraft(json.config); cfg.draft = toDraft(json.config); cfg.open.clear();
+  cfg.errors = {}; cfg.orig = toDraft(json.config); cfg.draft = toDraft(json.config); cfg.meta = json.config.meta; cfg.open.clear();
   renderSettings(); toast("Saved and applied to the running gateway"); load();
   if (json.generated.length) modal({
     title: json.generated.length > 1 ? "New client keys" : "New client key",

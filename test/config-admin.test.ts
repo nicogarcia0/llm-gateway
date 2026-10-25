@@ -209,3 +209,89 @@ test("resets a provider's breaker and the statistics", async (t) => {
   assert.equal((await gw.api("POST", "/admin/api/stats/reset")).status, 200);
   assert.equal(gw.stats.total, 0);
 });
+
+/* ---------- API formats ---------- */
+
+async function claudeLike(t: After) {
+  const seen: { url?: string; key?: string; body: string }[] = [];
+  const server = http.createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      seen.push({ url: req.url, key: req.headers["x-api-key"] as string, body });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ content: [{ type: "text", text: "pong" }], stop_reason: "end_turn", usage: { input_tokens: 5, output_tokens: 1 } }));
+    });
+  });
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+  return { url: await listen(server), seen };
+}
+
+test("describes each provider's API format and offers the presets", async (t) => {
+  const up = await upstream(t, "a");
+  const gw = await setup(t, { providers: [{ name: "a", baseUrl: up.url, format: "gemini" }, { name: "b", baseUrl: up.url }] });
+  const d = (await getConfig(gw)) as Desc & { meta: { formats: string[]; presets: Record<string, unknown>; variables: Record<string, string> } };
+  assert.deepEqual(d.providers.map((p) => p.format), ["gemini", "openai"]);
+  assert.deepEqual(Object.keys(d.meta.presets), ["anthropic", "gemini"]);
+  assert.ok("messages" in d.meta.variables);
+});
+
+test("switching a provider to another API format takes effect at once", async (t) => {
+  const claude = await upstream(t, "x");
+  const real = await claudeLike(t);
+  const gw = await setup(t, { providers: [{ name: "c", baseUrl: claude.url, keys: ["sk-ant-1"], models: ["m"] }] });
+  const d = draft(await getConfig(gw));
+  Object.assign(d.providers[0], { baseUrl: real.url, format: "anthropic" });
+  assert.equal((await gw.api("PUT", "/admin/api/config", d)).status, 200);
+  assert.equal(gw.read().providers[0].format, "anthropic");
+  assert.equal(gw.read().providers[0].adapter, undefined, "a preset needs no stored mapping");
+  const res = await fetch(`${gw.url}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "m", messages: [{ role: "user", content: "hi" }] }) });
+  assert.equal(((await res.json()) as { choices: { message: { content: string } }[] }).choices[0].message.content, "pong");
+  assert.equal(real.seen[0].url, "/messages");
+  assert.equal(real.seen[0].key, "sk-ant-1");
+});
+
+test("saves a custom adapter and rejects a broken one with the field path", async (t) => {
+  const up = await upstream(t, "a");
+  const gw = await setup(t, { providers: [{ name: "a", baseUrl: up.url }] });
+  const d = draft(await getConfig(gw));
+  const p = d.providers[0] as Record<string, unknown>;
+  p.format = "custom";
+  p.adapter = { path: "oops", request: { q: "{{nope}}" }, response: { text: "a..b" } };
+  const res = await gw.api("PUT", "/admin/api/config", d);
+  assert.equal(res.status, 422);
+  const paths = ((await res.json()) as { error: { issues: { path: string }[] } }).error.issues.map((i) => i.path);
+  for (const f of ["providers[0].adapter.path", "providers[0].adapter.request", "providers[0].adapter.response.text"]) assert.ok(paths.includes(f), `${f} in ${paths}`);
+  assert.equal(gw.read().providers[0].format, undefined);
+
+  p.adapter = { path: "/talk", auth: { header: "X-Key", scheme: "" }, request: { q: "{{last_user}}" }, response: { text: "out" } };
+  assert.equal((await gw.api("PUT", "/admin/api/config", d)).status, 200);
+  assert.equal(gw.read().providers[0].adapter?.path, "/talk");
+  assert.equal(((await getConfig(gw)).providers[0] as Record<string, unknown>).format, "custom");
+});
+
+test("sends a test message and shows what went out, what came back and the translation", async (t) => {
+  const real = await claudeLike(t);
+  const gw = await setup(t, { providers: [{ name: "c", baseUrl: real.url, format: "anthropic", keys: ["sk-ant-secret-1234"] }] });
+
+  const ok = (await (await gw.api("POST", "/admin/api/test-chat", { originalName: "c", baseUrl: real.url, format: "anthropic", model: "claude-x", key: { keep: 0 } })).json()) as Record<string, any>;
+  assert.equal(ok.ok, true);
+  assert.equal(ok.reply, "pong");
+  assert.equal(ok.sent.url, `${real.url}/messages`);
+  assert.equal(JSON.parse(ok.sent.body).model, "claude-x");
+  assert.equal(ok.sent.headers["x-api-key"], "••••1234");
+  assert.ok(!JSON.stringify(ok).includes("sk-ant-secret-1234"), "the key must not come back");
+  assert.equal(real.seen[0].key, "sk-ant-secret-1234");
+  assert.equal(ok.openai.choices[0].message.content, "pong");
+
+  const wrong = (await (await gw.api("POST", "/admin/api/test-chat", { baseUrl: real.url, format: "custom", model: "m", adapter: { path: "/x", request: { a: "{{model}}" }, response: { text: "nothing.here" } } })).json()) as Record<string, any>;
+  assert.equal(wrong.ok, false);
+  assert.match(wrong.error, /response mapping/);
+  assert.match(wrong.received, /pong/, "the raw answer is shown so the mapping can be fixed");
+
+  const invalid = (await (await gw.api("POST", "/admin/api/test-chat", { baseUrl: real.url, format: "custom", model: "m", adapter: { path: "x" } })).json()) as Record<string, any>;
+  assert.match(invalid.error, /Fix the format first/);
+});

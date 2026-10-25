@@ -3,10 +3,11 @@ import { readFileSync } from "node:fs";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { Readable } from "node:stream";
 import { resolveSecret, withDefaults, type Config } from "./config.ts";
-import { ConfigError, describe, merge, type Store } from "./configAdmin.ts";
+import { ConfigError, describe, merge, probeChat, type Store } from "./configAdmin.ts";
 import { QueueFullError, TokenBucket } from "./limits.ts";
 import { Metrics } from "./metrics.ts";
 import { Provider, pickOrder } from "./pool.ts";
+import { buildUpstream, completionAsSse, errorMessage, isTextChat, toOpenAI, translateStream } from "./adapters.ts";
 import { Stats } from "./stats.ts";
 import { buildOverview } from "./admin.ts";
 
@@ -105,19 +106,26 @@ export function createGateway(config: Config, opts: { log?: boolean; store?: Sto
     const raw = await readBody(req, MAX_BODY_BYTES).catch(() => null);
     if (!raw) return sendError(res, 413, "invalid_request_error", "Request body too large or unreadable");
 
-    let model: unknown;
+    let parsed: Record<string, unknown>;
     try {
-      model = JSON.parse(raw.toString("utf8"))?.model;
+      parsed = JSON.parse(raw.toString("utf8"));
     } catch {
       return sendError(res, 400, "invalid_request_error", "Body must be valid JSON");
     }
+    const model = parsed?.model;
     if (typeof model !== "string") return sendError(res, 400, "invalid_request_error", "Field 'model' is required");
+    const wantStream = parsed.stream === true;
 
-    const candidates = pickOrder(providers, model);
+    // adapters translate plain text chat only; tools, images and other endpoints stay with OpenAI-format providers
+    const translatable = url.pathname === "/v1/chat/completions" && isTextChat(parsed);
+    const candidates = pickOrder(providers, model, translatable);
     if (candidates.length === 0) {
       ctx.model = "(unrouted)";
       metrics.inc("gateway_rejected_total", { reason: "no_provider" });
-      return sendError(res, 503, "service_unavailable", `No provider available for model '${model}'`, {
+      const onlyAdapters = !translatable && providers.some((p) => p.adapter && p.supports(model) && !p.breakerOpen);
+      return sendError(res, 503, "service_unavailable", onlyAdapters
+        ? `Model '${model}' is only served by providers with a translated API, which handle plain text chat only (no tools, images or other endpoints)`
+        : `No provider available for model '${model}'`, {
         "retry-after": "5",
       });
     }
@@ -163,16 +171,20 @@ export function createGateway(config: Config, opts: { log?: boolean; store?: Sto
           const timer = setTimeout(() => attempt.abort(), config.upstreamTimeoutMs);
           clientGone.signal.addEventListener("abort", () => attempt.abort(), { once: true });
 
+          const ad = provider.adapter;
+          const translated = ad ? buildUpstream(ad, parsed, provider.baseUrl, key.value, wantStream) : null;
           let upstream: Response;
           try {
-            upstream = await fetch(`${provider.baseUrl}${path}`, {
+            upstream = await fetch(translated ? translated.url : `${provider.baseUrl}${path}`, {
               method: "POST",
-              headers: {
-                "content-type": "application/json",
-                accept: req.headers.accept ?? "application/json",
-                ...(key.value ? { authorization: `Bearer ${key.value}` } : {}),
-              },
-              body: new Uint8Array(raw),
+              headers: translated
+                ? translated.headers
+                : {
+                    "content-type": "application/json",
+                    accept: req.headers.accept ?? "application/json",
+                    ...(key.value ? { authorization: `Bearer ${key.value}` } : {}),
+                  },
+              body: translated ? translated.body : new Uint8Array(raw),
               signal: attempt.signal,
             });
           } catch {
@@ -207,11 +219,54 @@ export function createGateway(config: Config, opts: { log?: boolean; store?: Sto
             break;
           }
 
-          provider.recordSuccess();
           const headers: Record<string, string> = {
             "x-gateway-provider": provider.name,
             "x-request-id": id,
           };
+
+          if (ad && translated) {
+            // the provider speaks another API: answer the client in OpenAI format
+            if (status >= 400) {
+              const text = await upstream.text().catch(() => "");
+              provider.recordSuccess();
+              ctx.provider = provider.name;
+              return sendError(res, status, "upstream_error", `${provider.name}: ${errorMessage(ad, text, status)}`, headers);
+            }
+            const sseHeaders = { ...headers, "content-type": "text/event-stream", "cache-control": "no-cache" };
+            if (translated.streaming && upstream.body) {
+              provider.recordSuccess();
+              ctx.provider = provider.name;
+              res.writeHead(200, sseHeaders);
+              handedOff = true;
+              res.on("close", release);
+              Readable.fromWeb(upstream.body.pipeThrough(translateStream(ad, model)) as never)
+                .on("error", () => res.destroy())
+                .pipe(res);
+              return;
+            }
+            const bodyTimer = setTimeout(() => attempt.abort(), config.upstreamTimeoutMs);
+            const completion = await upstream.json().then((j) => toOpenAI(ad, j, model), () => null).finally(() => clearTimeout(bodyTimer));
+            if (clientGone.signal.aborted) return;
+            if (!completion) {
+              provider.recordFailure();
+              sawUpstreamFailure = true;
+              lastError = `${provider.name}: could not read a reply from the provider's answer (check the response mapping)`;
+              metrics.inc("gateway_retries_total", { provider: provider.name, reason: "bad_response" });
+              break;
+            }
+            provider.recordSuccess();
+            ctx.provider = provider.name;
+            if (wantStream) {
+              res.writeHead(200, sseHeaders);
+              res.end(completionAsSse(completion));
+            } else {
+              res.writeHead(200, { ...headers, "content-type": "application/json" });
+              res.end(JSON.stringify(completion));
+            }
+            return;
+          }
+
+          provider.recordSuccess();
           const ct = upstream.headers.get("content-type");
           if (ct) headers["content-type"] = ct;
           res.writeHead(status, headers);
@@ -320,6 +375,12 @@ export function createGateway(config: Config, opts: { log?: boolean; store?: Sto
       } catch (e) {
         return sendJson(res, 200, { ok: false, status: 0, ms: Date.now() - t0, error: e instanceof Error && e.name === "TimeoutError" ? "Timed out after 8s" : "Could not connect", models: [] });
       }
+    }
+
+    if (route === "POST /admin/api/test-chat") {
+      const b = await body();
+      if (!b || typeof b !== "object") return sendError(res, 400, "invalid_request_error", "Body must be a JSON object");
+      return sendJson(res, 200, await probeChat(b as Record<string, unknown>, store, env));
     }
 
     if (url.pathname === "/admin/api/config" && (req.method === "GET" || req.method === "PUT")) {

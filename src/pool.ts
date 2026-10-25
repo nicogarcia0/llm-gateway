@@ -1,5 +1,6 @@
 import { mask, type Config, type ProviderConfig } from "./config.ts";
 import { Semaphore } from "./limits.ts";
+import { resolveAdapter, validateAdapter, type AdapterConfig } from "./adapters.ts";
 
 type KeyState = { value: string; cooldownUntil: number; uses: number };
 
@@ -9,6 +10,9 @@ export class Provider {
   readonly weight: number;
   readonly models: string[];
   readonly limiter: Semaphore;
+  /** null = the provider speaks OpenAI and requests pass through untouched. */
+  readonly adapter: AdapterConfig | null;
+  readonly format: string;
   /** Same config + breaker settings => same signature, so a config reload can keep this instance and its live state. */
   readonly signature: string;
   private keys: KeyState[];
@@ -22,6 +26,10 @@ export class Provider {
     this.signature = Provider.signature(cfg, breaker);
     this.name = cfg.name;
     this.baseUrl = cfg.baseUrl.replace(/\/$/, "");
+    this.format = cfg.format ?? "openai";
+    this.adapter = resolveAdapter(cfg.format, cfg.adapter);
+    const problems = validateAdapter(this.adapter);
+    if (problems.length) throw new Error(`Provider ${cfg.name}: adapter.${problems[0].path}: ${problems[0].message}`);
     this.weight = cfg.weight ?? 1;
     this.models = cfg.models ?? [];
     this.limiter = new Semaphore(cfg.maxConcurrent ?? 8, cfg.queueSize ?? 32);
@@ -99,9 +107,10 @@ export class Provider {
   }
 }
 
-export function pickOrder(providers: Provider[], model: string): Provider[] {
+/** `translatable`: false for requests an adapter cannot carry (tools, images, other endpoints), which only OpenAI-format providers get. */
+export function pickOrder(providers: Provider[], model: string, translatable = true): Provider[] {
   return providers
-    .filter((p) => p.supports(model) && !p.breakerOpen)
+    .filter((p) => p.supports(model) && !p.breakerOpen && (translatable || !p.adapter))
     .map((p) => ({ p, score: p.load + Math.random() * 1e-6 }))
     .sort((a, b) => a.score - b.score)
     .map((x) => x.p);

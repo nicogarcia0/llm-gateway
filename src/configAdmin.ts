@@ -1,6 +1,7 @@
 import { copyFileSync, existsSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { mask, resolveSecret, withDefaults, type Config, type ConfigInput, type ProviderConfig } from "./config.ts";
+import { CUSTOM_STARTER, FORMATS, PRESETS, VARIABLES, buildUpstream, resolveAdapter, toOpenAI, validateAdapter, type AdapterConfig, type Format } from "./adapters.ts";
 
 /** Where the editable config lives. `raw` is the file as written (with `env:` references), never the resolved secrets. */
 export type Store = { raw: ConfigInput; save(next: ConfigInput): void };
@@ -48,8 +49,11 @@ export function describe(raw: ConfigInput, config: Config, env: NodeJS.ProcessEn
       maxConcurrent: p.maxConcurrent!,
       queueSize: p.queueSize!,
       models: p.models!,
+      format: p.format ?? "openai",
+      adapter: p.adapter ?? null,
       keys: (raw.providers[i]?.keys ?? []).map((k) => secretView(k, env)),
     })),
+    meta: { formats: FORMATS, presets: PRESETS, starter: CUSTOM_STARTER, variables: VARIABLES },
     clients: config.clientKeys.map((c, i) => ({
       name: c.name,
       ratePerMinute: c.ratePerMinute!,
@@ -127,6 +131,21 @@ export function merge(raw: ConfigInput, body: unknown, env: NodeJS.ProcessEnv) {
       envOk(kat, v);
       return v;
     });
+    let format: Format = "openai";
+    if (p.format !== undefined && p.format !== null) {
+      if (FORMATS.includes(p.format as Format)) format = p.format as Format;
+      else bad(`${at}.format`, `Unknown API format "${String(p.format)}"`);
+    }
+    let adapter: AdapterConfig | undefined;
+    if (format !== "openai") {
+      if (p.adapter !== undefined && p.adapter !== null && !isObj(p.adapter)) bad(`${at}.adapter`, "Invalid adapter");
+      else if (isObj(p.adapter)) {
+        const a = p.adapter as AdapterConfig;
+        adapter = { path: a.path, auth: a.auth, headers: a.headers, defaults: a.defaults, request: a.request, response: a.response, streaming: a.streaming };
+        if (JSON.stringify(adapter).length > 40_000) bad(`${at}.adapter`, "Adapter is too large");
+      }
+      for (const issue of validateAdapter(resolveAdapter(format, adapter))) bad(`${at}.adapter.${issue.path}`, issue.message);
+    }
     const models = [...new Set((Array.isArray(p.models) ? p.models : []).map((m: unknown) => (typeof m === "string" ? m.trim() : "")).filter(Boolean))].slice(0, 200) as string[];
     return {
       ...old,
@@ -137,6 +156,8 @@ export function merge(raw: ConfigInput, body: unknown, env: NodeJS.ProcessEnv) {
       queueSize: num(`${at}.queueSize`, p.queueSize, 0, 10_000),
       models,
       keys,
+      format: format === "openai" ? undefined : format,
+      adapter,
     };
   });
 
@@ -193,4 +214,60 @@ export function merge(raw: ConfigInput, body: unknown, env: NodeJS.ProcessEnv) {
     throw new ConfigError([{ path: "", message: e instanceof Error ? e.message : String(e) }]);
   }
   return { raw: next, config, generated };
+}
+
+/**
+ * Sends one sample chat message through a provider definition that may not be saved yet, and reports what was
+ * sent, what came back and how it was translated. This is how you debug a custom adapter.
+ */
+export async function probeChat(b: Record<string, unknown>, store: Store | undefined, env: NodeJS.ProcessEnv) {
+  const fail = (error: string, extra: Record<string, unknown> = {}) => ({ ok: false, status: 0, ms: 0, error, ...extra });
+  const base = typeof b.baseUrl === "string" ? b.baseUrl.trim().replace(/\/$/, "") : "";
+  if (!/^https?:\/\//.test(base)) return fail("Enter a valid http(s) base URL first");
+  const model = typeof b.model === "string" ? b.model.trim() : "";
+  if (!model) return fail("Enter a model name to test with");
+  const format = FORMATS.includes(b.format as Format) ? (b.format as Format) : "openai";
+  const spec = resolveAdapter(format, isObj(b.adapter) ? (b.adapter as AdapterConfig) : undefined);
+  const issue = validateAdapter(spec)[0];
+  if (issue) return fail(`Fix the format first: ${issue.path}: ${issue.message}`);
+
+  let key: string | null = null;
+  try {
+    const k = b.key;
+    if (typeof k === "string" && k.trim()) key = resolveSecret(k.trim(), env);
+    else if (isObj(k) && typeof k.keep === "number") {
+      const stored = store?.raw.providers.find((p) => p.name === b.originalName)?.keys?.[k.keep];
+      if (stored) key = resolveSecret(stored, env);
+    }
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : String(e));
+  }
+
+  const sample = { model, max_tokens: 64, messages: [{ role: "user", content: typeof b.message === "string" && b.message.trim() ? b.message.slice(0, 500) : "Reply with the single word: pong" }] };
+  const sent = spec
+    ? buildUpstream(spec, sample, base, key, false)
+    : { url: `${base}/chat/completions`, headers: { "content-type": "application/json", ...(key ? { authorization: `Bearer ${key}` } : {}) }, body: JSON.stringify(sample) };
+  const shownHeaders = Object.fromEntries(Object.entries(sent.headers).map(([k, v]) => [k, key && v.includes(key) ? v.replace(key, mask(key)) : v]));
+  const view = { url: sent.url, headers: shownHeaders, body: JSON.stringify(JSON.parse(sent.body), null, 2) };
+
+  const t0 = Date.now();
+  try {
+    const r = await fetch(sent.url, { method: "POST", headers: sent.headers, body: sent.body, signal: AbortSignal.timeout(20_000) });
+    const text = await r.text();
+    let reply: string | undefined, openai: unknown = null;
+    try {
+      const json = JSON.parse(text);
+      if (spec) {
+        openai = toOpenAI(spec, json, model);
+        reply = (openai as { choices: { message: { content: string } }[] } | null)?.choices[0].message.content;
+      } else reply = json?.choices?.[0]?.message?.content;
+    } catch {}
+    const ok = r.ok && typeof reply === "string";
+    return {
+      ok, status: r.status, ms: Date.now() - t0, sent: view, received: text.slice(0, 4000), reply: reply ?? null, openai,
+      error: ok ? undefined : r.ok ? "The provider answered, but no reply text was found. Check the response mapping against the raw answer below." : `The provider answered ${r.status}`,
+    };
+  } catch (e) {
+    return fail(e instanceof Error && e.name === "TimeoutError" ? "Timed out after 20s" : "Could not connect", { ms: Date.now() - t0, sent: view });
+  }
 }
