@@ -1,8 +1,17 @@
 # llm-gateway
 
+[![CI](https://github.com/nicogarcia0/llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/nicogarcia0/llm-gateway/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node 22.18+](https://img.shields.io/badge/node-%E2%89%A522.18-339933.svg)](package.json)
+[![Live demo](https://img.shields.io/badge/live%20demo-gateway.nicogarciatirado.com-2dd4bf.svg)](https://gateway.nicogarciatirado.com)
+
 A small proxy that sits between your apps and one or more LLM providers. It speaks the OpenAI API, so existing clients only need a different base URL.
 
 It handles the parts that get repetitive once several services call LLMs: spreading load across providers, falling back when one fails, pooling API keys, queueing, and rate limiting per client.
+
+**[Try the live demo](https://gateway.nicogarciatirado.com)**: the real dashboard running on simulated traffic. Nothing to install.
+
+[![The dashboard: traffic, success rate, latency, top models, provider health and recent errors](docs/images/overview.png)](https://gateway.nicogarciatirado.com)
 
 ```
 client A ─┐                                       ┌─▶ provider 1 (keys k1, k2)
@@ -184,6 +193,17 @@ A built-in web panel to watch the gateway and change its settings without touchi
 
 ![Overview: traffic chart, success rate, latency, top models, provider health and recent errors](docs/images/overview.png)
 
+### Try it without installing
+
+**https://gateway.nicogarciatirado.com** runs this same dashboard against a simulated gateway, so you can click around before installing anything. A notice on arrival says so, and a *Simulated data* pill stays in the top bar.
+
+It is not a mock-up of the screens. The page is the real `src/admin.html`, and the "server" behind it is the gateway's own code (the providers, the statistics, the config validation and the API adapters) compiled for the browser, fed with generated traffic and a stand-in for the AI providers. So settings are validated by the real rules, changing a provider's weight really changes where the simulated traffic goes, and *Send test message* runs the real translation. Nothing leaves your browser, nothing is saved, and a reload starts over.
+
+```bash
+npm run demo:build    # static site in demo/dist
+npm run demo:deploy   # build and deploy it to Cloudflare with wrangler
+```
+
 ### Turn it on
 
 1. Pick an admin key and put it in your config (the example config already does this):
@@ -253,7 +273,7 @@ How saving works:
 
 ### Good to know
 
-- **The config file must be writable.** With Docker, `docker-compose.yml` mounts `config.json` read-write; the container runs as the `node` user, so run `chmod a+rw config.json` (or `chown 1000 config.json`) once. If the file cannot be written, Settings stays read-only and tells you why.
+- **The config file must be writable.** With Docker, `docker-compose.yml` mounts `config.json` read-write; the container runs as the `node` user, so run `chmod a+rw config.json` (or `chown 1000 config.json`) once. If the file cannot be written, saving fails with a message and nothing changes. The previous version is kept as `config.json.bak` next to the file when its folder is writable; with Docker's single-file mount the copy stays inside the container.
 - **Keys typed into the panel are saved in plain text** in `config.json`, like any key you would paste there. Use `env:NAME` to keep secrets in the environment instead. Keep `config.json` and `config.json.bak` out of version control (they are in `.gitignore`).
 - **The admin key and the port cannot be changed from the panel**, so a typo can never lock you out. Edit the file or the environment and restart.
 - **Statistics live in memory** and reset when the gateway restarts. Requests that the client abandons, or streams cut after they started, are counted as `499 aborted` and not as failures.
@@ -315,7 +335,7 @@ npm test
 npm run typecheck
 ```
 
-The tests start fake upstream servers in-process, so no API keys are needed. They cover failover, the circuit breaker, key rotation, auth, rate limiting, queueing and load shedding, streaming, client disconnects, oversized bodies, model routing and metrics, plus the API translation (Anthropic and Gemini requests, custom mappings, streaming, failover, errors) and the admin dashboard: statistics, access control and lockout, config validation, hot reload, secret masking and the `env:` references that must survive a save.
+The tests start fake upstream servers in-process, so no API keys are needed. They cover failover, the circuit breaker, key rotation, auth, rate limiting, queueing and load shedding, streaming, client disconnects, oversized bodies, model routing and metrics, plus the demo site (its simulated backend, the real validation behind it, and the build output) and the API translation (Anthropic and Gemini requests, custom mappings, streaming, failover, errors) and the admin dashboard: statistics, access control and lockout, config validation, hot reload, secret masking and the `env:` references that must survive a save.
 
 ## License
 
