@@ -11,7 +11,9 @@
     "start": "node --env-file-if-exists=.env src/index.ts",
     "dev": "node --watch --env-file-if-exists=.env src/index.ts",
     "test": "node --test \"test/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "demo:build": "node demo/build.mjs",
+    "demo:deploy": "node demo/build.mjs && npx wrangler deploy --config demo/wrangler.jsonc"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

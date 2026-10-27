@@ -1,0 +1,34 @@
+<style>
+.demo-pill { gap: 8px; color: var(--info); border-color: color-mix(in srgb, var(--info) 35%, var(--border)); background: var(--info-bg); font-weight: 560; }
+.demo-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--info); }
+.demo-modal { width: min(560px, calc(100% - 32px)); }
+.demo-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; margin-bottom: 14px; }
+.demo-lang { display: inline-flex; flex: none; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.demo-lang button { min-width: 40px; height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; transition: background .15s, color .15s; }
+.demo-lang button:hover { color: var(--text); }
+.demo-lang button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px #0003; }
+.demo-lang button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; } /* inset, so the ring never spills onto its neighbour */
+.demo-modal h2 { font-size: 21px; letter-spacing: -.02em; line-height: 1.25; }
+.demo-modal p { font-size: 14px; line-height: 1.6; margin-top: 10px; }
+.demo-list { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13.5px; color: var(--muted); }
+.demo-list li::marker { color: var(--accent); }
+.demo-modal { max-height: calc(100% - 32px); overflow: auto; }
+.demo-modal .modal-f { flex-wrap: wrap; justify-content: flex-end; }
+.demo-modal .modal-f .btn { flex: 1 1 auto; justify-content: center; text-align: center; white-space: normal; height: auto; min-height: 34px; padding: 6px 14px; text-decoration: none; }
+@media (max-width: 480px) { .demo-modal .modal-f { flex-direction: column-reverse; } .demo-modal .modal-f .btn { width: 100%; } }
+@media (max-width: 860px) { .demo-pill { padding: 0 11px; } }
+@media (max-width: 560px) { .demo-pill { font-size: 0; gap: 0; width: 34px; padding: 0; } .demo-pill::before { width: 9px; height: 9px; } }
+</style>
+<script>
+// The dashboard calls /admin/api/*. In the demo those calls never leave the page: they wait for the simulated backend.
+window.process = { version: "v24.14.1", env: {}, memoryUsage: { rss: () => 94 * 1048576 } };
+(() => {
+  const real = window.fetch.bind(window);
+  window.__demoReady = new Promise((resolve) => (window.__demoResolve = resolve));
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input.url;
+    return url.startsWith("/admin/api/") ? (await window.__demoReady)(url, init || {}) : real(input, init);
+  };
+  try { sessionStorage.setItem("llm-gateway-admin-key", "demo"); } catch {}
+})();
+</script>

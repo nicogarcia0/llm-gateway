@@ -1,0 +1,9 @@
+{
+  "name": "llm-gateway-demo",
+  "compatibility_date": "2026-09-18",
+  "assets": { "directory": "./dist" },
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "gateway.nicogarciatirado.com", "custom_domain": true, "zone_name": "nicogarciatirado.com" }
+  ]
+}
