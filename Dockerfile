@@ -1,5 +1,6 @@
 FROM node:24-alpine
 WORKDIR /app
+RUN chown node:node /app
 COPY package.json ./
 COPY src ./src
 ENV NODE_ENV=production CONFIG_PATH=/app/config.json

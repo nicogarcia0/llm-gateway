@@ -20,7 +20,9 @@ export function fileStore(path: string, raw: ConfigInput): Store {
     raw,
     save(next) {
       // written in place: a single-file Docker bind mount cannot be replaced by rename
-      if (existsSync(path)) copyFileSync(path, `${path}.bak`);
+      try {
+        if (existsSync(path)) copyFileSync(path, `${path}.bak`);
+      } catch {} // best effort: a read-only folder must not block a valid save
       writeFileSync(path, JSON.stringify(next, null, 2) + "\n", { mode: 0o600 });
       this.raw = next;
     },
@@ -220,7 +222,7 @@ export function merge(raw: ConfigInput, body: unknown, env: NodeJS.ProcessEnv) {
  * Sends one sample chat message through a provider definition that may not be saved yet, and reports what was
  * sent, what came back and how it was translated. This is how you debug a custom adapter.
  */
-export async function probeChat(b: Record<string, unknown>, store: Store | undefined, env: NodeJS.ProcessEnv) {
+export async function probeChat(b: Record<string, unknown>, store: Pick<Store, "raw"> | undefined, env: NodeJS.ProcessEnv, doFetch: typeof fetch = fetch) {
   const fail = (error: string, extra: Record<string, unknown> = {}) => ({ ok: false, status: 0, ms: 0, error, ...extra });
   const base = typeof b.baseUrl === "string" ? b.baseUrl.trim().replace(/\/$/, "") : "";
   if (!/^https?:\/\//.test(base)) return fail("Enter a valid http(s) base URL first");
@@ -252,7 +254,7 @@ export async function probeChat(b: Record<string, unknown>, store: Store | undef
 
   const t0 = Date.now();
   try {
-    const r = await fetch(sent.url, { method: "POST", headers: sent.headers, body: sent.body, signal: AbortSignal.timeout(20_000) });
+    const r = await doFetch(sent.url, { method: "POST", headers: sent.headers, body: sent.body, signal: AbortSignal.timeout(20_000) });
     const text = await r.text();
     let reply: string | undefined, openai: unknown = null;
     try {
